@@ -1,0 +1,11 @@
+# .env
+.env
+
+# needed for grimoire, otherwise it won't ignore the node_modules directory becaus our real .gitignore is in the root
+node_modules
+
+# nohup
+nohup.out
+
+# mp4s generated in CLI mode
+*.mp4

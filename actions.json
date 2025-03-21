@@ -1,0 +1,26 @@
+[
+    {
+        "name": "author-speak-before",
+        "value": "Let's learn how to use the print function in Python!"
+    },
+    {
+        "name": "author-speak-before",
+        "value": "First, let's make a Python file."
+    },
+    {
+        "name": "file-explorer-create-file",
+        "value": "main.py"
+    },
+    {
+        "name": "file-explorer-open-file",
+        "value": "main.py"
+    },
+    {
+        "name": "author-speak-before",
+        "value": "and let's print 'Hello world!' to the console."
+    },
+    {
+        "name": "editor-type",
+        "value": "print('Hello, world!')"
+    }
+]
