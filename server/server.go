@@ -188,7 +188,11 @@ func ProcessJob(manifestPath string, mode string) {
 		if err != nil {
 			log.Printf("Failed to get RAM usage: %v", err)
 		}
-		slack.SendSlackMessage(fmt.Sprintf("%s: Job %s processed successfully (RAM usage is at %s)", os.Getenv("ENVIRONMENT"), uuid, ramUsage))
+		environment := os.Getenv("ENVIRONMENT")
+		if environment == "" {
+			environment = "unknown env"
+		}
+		slack.SendSlackMessage(fmt.Sprintf("%s: Job %s processed successfully (RAM usage is at %s)", strings.ToUpper(environment), uuid, ramUsage))
 	}
 
 	if mode == "cli" {

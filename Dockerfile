@@ -1,49 +1,42 @@
-# Stage 1: Build the Go binary
-FROM golang:1.23-alpine AS builder
+# Start with zenika/alpine-chrome:with-puppeteer as base image for Puppeteer support
+FROM zenika/alpine-chrome:with-puppeteer AS base
 
-# Install git (if needed for dependencies)
-RUN apk add --no-cache git
-WORKDIR /usr/src/app
+# Install Go
+RUN apk add --no-cache go git
 
-# Copy go.mod and go.sum files and download dependencies
+# Set working directory
+WORKDIR /app
+
+# Copy Go module files first for better layer caching
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy all source files
+# Copy the rest of the Go source code
 COPY . .
 
-# Copy environment file
-COPY .env .
+# Build the Go CLI application
+RUN go build -o codevideo
 
-# Build the binary with optimizations for production (-s -w removes debug info)
-RUN go build -ldflags="-s -w" -o codevideo-cli main.go
-
-# Stage 2: Build the puppeteer-runner
-RUN apk add --no-cache nodejs npm
-WORKDIR /usr/src/app/puppeteer-runner
+# Install Node.js dependencies for puppeteer-runner
+WORKDIR /app/puppeteer-runner
 RUN npm install
 
-# Stage 2: Create a minimal runtime image
-FROM zenika/alpine-chrome:with-puppeteer
+# Return to app directory
+WORKDIR /app
 
-# Switch to root to install packages
-USER root
+# Create a volume for output videos
+VOLUME /app/output
 
-# Install FFmpeg (needed for final webm to mp4 conversion)
-RUN apk add --no-cache ffmpeg
+# Set environment variables from .env file at runtime
+# Use .env.example as default
+COPY .env.example /.env.example
+# Create empty .env file that can be overridden by mounting
+RUN touch /.env
 
-WORKDIR /usr/src/app
+# Expose port for server mode
+EXPOSE 8080
 
-# Copy the Go binary from the builder stage
-COPY --from=builder /usr/src/app/codevideo-cli .
-
-# Copy the puppeteer-runner folder if needed by the Go binary
-COPY --from=builder /usr/src/app/puppeteer-runner ./puppeteer-runner
-
-# Copy the environment file into the final image
-COPY --from=builder /usr/src/app/.env .
-
-# Expose 7000
-EXPOSE 7000
-
-CMD ["./codevideo-cli"]
+# Set entrypoint
+ENTRYPOINT ["/app/codevideo"]
+# Default command (can be overridden)
+CMD ["-m", "serve"]

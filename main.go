@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
 
@@ -13,17 +14,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// const for version string
+const version = "0.0.2"
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "codevideo",
 	Short: "CodeVideo's CLI tool",
 	Long:  `CodeVideo's CLI tool for processing video jobs.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Check for version flag first
+		showVersion, _ := cmd.Flags().GetBool("version")
+		if showVersion {
+			fmt.Printf("CodeVideo CLI v%s\n\n✨Sufficiently advanced technology is indistinguishable from magic.✨", version)
+			return
+		}
+
 		// apply logging level before anything
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		if verbose {
 			log.SetLevel(log.DebugLevel)
-			log.Printf("CodeVideo CLI v0.0.1 - verbose logging enabled")
+			log.Printf("CodeVideo CLI v%s - verbose logging enabled", version)
 		} else {
 			log.SetLevel(log.ErrorLevel)
 		}
@@ -67,6 +78,9 @@ func init() {
 
 	// --verbose or -v flag for verbose output
 	rootCmd.Flags().BoolP("verbose", "v", false, "Verbose output")
+
+	// --version or -V flag for displaying version
+	rootCmd.Flags().BoolP("version", "V", false, "Display version information")
 }
 
 func main() {

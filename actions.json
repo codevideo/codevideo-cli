@@ -1,26 +1,154 @@
 [
-    {
-        "name": "author-speak-before",
-        "value": "Let's learn how to use the print function in Python!"
-    },
-    {
-        "name": "author-speak-before",
-        "value": "First, let's make a Python file."
-    },
-    {
-        "name": "file-explorer-create-file",
-        "value": "main.py"
-    },
-    {
-        "name": "file-explorer-open-file",
-        "value": "main.py"
-    },
-    {
-        "name": "author-speak-before",
-        "value": "and let's print 'Hello world!' to the console."
-    },
-    {
-        "name": "editor-type",
-        "value": "print('Hello, world!')"
-    }
+  {
+    "name": "author-speak-before",
+    "value": "Hi guys, Chris here - I've just added some major updates to the CodeVideo React IDE. I'm excited to show you the new features we've implemented!"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "One of our biggest improvements is the enhanced file explorer with context menus. Let me demonstrate how to create files using this new feature."
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Let's create our first file called a.txt using the new context menu."
+  },
+  {
+    "name": "mouse-move-file-explorer",
+    "value": "1"
+  },
+  {
+    "name": "mouse-right-click",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Notice how we now have a context menu whenever right clicking in the file explorer - this is one of our new features!"
+  },
+  {
+    "name": "mouse-move-file-explorer-context-menu-new-file",
+    "value": "1"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "file-explorer-type-new-file-input",
+    "value": "a.txt"
+  },
+  {
+    "name": "file-explorer-enter-new-file-input",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Perfect! Now let's create a second file to show how our multi-tab support works."
+  },
+  {
+    "name": "mouse-move-file-explorer",
+    "value": "1"
+  },
+  {
+    "name": "mouse-right-click",
+    "value": "1"
+  },
+  {
+    "name": "mouse-move-file-explorer-context-menu-new-file",
+    "value": "1"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "file-explorer-type-new-file-input",
+    "value": "b.txt"
+  },
+  {
+    "name": "file-explorer-enter-new-file-input",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "And now a third file - our advanced mouse tracking system allows for seamless interaction between multiple files."
+  },
+  {
+    "name": "mouse-move-file-explorer",
+    "value": "1"
+  },
+  {
+    "name": "mouse-right-click",
+    "value": "1"
+  },
+  {
+    "name": "mouse-move-file-explorer-context-menu-new-file",
+    "value": "1"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "file-explorer-type-new-file-input",
+    "value": "c.txt"
+  },
+  {
+    "name": "file-explorer-enter-new-file-input",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Now let's add some content to our c.txt file to demonstrate another new feature - our unsaved changes detection system."
+  },
+  {
+    "name": "mouse-move-editor",
+    "value": "1"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "editor-type",
+    "value": "console.log('Hello, world!');"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Great! Now let's try to close this file without saving it to trigger our brand new unsaved changes dialog."
+  },
+  {
+    "name": "mouse-move-editor-tab-close",
+    "value": "c.txt"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "As you can see, we now have a professional IDE-style unsaved changes dialog that prompts you to save your work!"
+  },
+  {
+    "name": "mouse-move-unsaved-changes-dialog-button-dont-save",
+    "value": "1"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "We chose not to save the changes, and now the file is closed. Let's close another tab to show how our tab management works."
+  },
+  {
+    "name": "mouse-move-editor-tab-close",
+    "value": "a.txt"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "And that's it! We now have an IDE that is eerily realistic and has nearly anything you can think of for an educational course - with context menus, advanced mouse tracking, tab management, and unsaved changes detection. Thanks for checking out our latest updates to the CodeVideo React IDE! Lots more coming soon - stay tuned!"
+  }
 ]

@@ -65,8 +65,27 @@ nohup ./codevideo -m serve &
 
 ## Docker 
 
-Coming soon.
+Build the container
 
+```shell
+docker build -t codevideo .
+```
+
+Run in server mode (default)
+
+```shell
+docker run -p 8080:8080 -v $(pwd)/.env:/.env -v $(pwd)/output:/app/output codevideo
+```
+
+# Run with specific actions
+
+```shell
+docker run -v $(pwd)/.env:/.env -v $(pwd)/output:/app/output codevideo -p "[{\"name\":\"author-speak-before\",\"value\":\"Let's learn how to use the print function in Python!\"}]"
+```
+
+## For Developers
+
+Update the Gatsby static site by replacing the public folder within `cli/staticserver`. Everything in the `public` folder is treated as an embedded go resource and served by the server.
 
 ## CodeVideo Studio
 
