@@ -85,7 +85,9 @@ docker run -v $(pwd)/.env:/.env -v $(pwd)/output:/app/output codevideo -p "[{\"n
 
 ## For Developers
 
-Update the Gatsby static site by replacing the public folder within `cli/staticserver`. Everything in the `public` folder is treated as an embedded go resource and served by the server.
+You can update the Gatsby static site by replacing the `public` folder within `cli/staticserver`. We recommend you use the `example` site within the `example` folder of the [`@fullstackcraftllc/codevideo-ide-react`](https://github.com/codevideo/codevideo-ide-react) repository.
+
+Everything in the `public` folder is treated as an embedded go resource and served by the server.
 
 ## CodeVideo Studio
 

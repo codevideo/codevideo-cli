@@ -1,46 +1,70 @@
 const { launch, getStream, wss } = require("puppeteer-stream");
 const fs = require("fs");
 const path = require("path");
-const { exec } = require("child_process");
+const yargs = require('yargs/yargs');
+const { hideBin } = require('yargs/helpers');
 
 // define sleep helper function
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 
-// standard 1080p resolution
-const width = 1920;
-const height = 1080;
+// Parse command line arguments
+const argv = yargs(hideBin(process.argv))
+  .option('uuid', {
+    type: 'string',
+    description: 'Path to the manifest file'
+  })
+  .option('os', {
+    type: 'string',
+    default: 'linux',
+    description: 'Operating system (linux or mac)'
+  })
+  .option('resolution', {
+    type: 'string',
+    default: '1080p',
+    description: 'Video resolution (1080p or 4K)'
+  })
+  .option('orientation', {
+    type: 'string',
+    default: 'landscape',
+    description: 'Video orientation (landscape or portrait)'
+  })
+  .argv;
 
-// standard 4K resolution (could be a nice premium feature)
-// const width = 3840;
-// const height = 2160;
+// parse uuid, resolution and orientation from command line arguments
+const uuid = argv.uuid;
+const os = argv.os;
+const resolution = argv.resolution;
+const orientation = argv.orientation;
+
+// set width and height based on resolution and orientation
+let width, height;
+if (resolution === '4K') {
+    width = orientation === 'landscape' ? 3840 : 2160;
+    height = orientation === 'landscape' ? 2160 : 3840;
+} else if (resolution === '1080p') {
+    width = orientation === 'landscape' ? 1920 : 1080;
+    height = orientation === 'landscape' ? 1080 : 1920;
+}
+// if no manifest is provided, exit
+if (!uuid) {
+    console.error("Please provide a manifest file path.");
+    process.exit(1);
+}
 
 async function recordVideoV3() {
-    // if no uuid is provided, exit
-    if (!process.argv[2]) {
-        console.error("Please provide a UUID as the first argument.");
-        process.exit(1);
-    }
-
-    // get  uuid from first argument
-    const uuid = process.argv[2];
-
-    // if a third argument is provided, use it as the operating system
-    const OPERATING_SYSTEM = process.argv[3] || "linux";
-
     console.log("Starting recording for UUID: ", uuid);
 
     const outputWebm = path.join(__dirname, `../../tmp/v3/video/${uuid}.webm`);
-    const outputMp4 = path.join(__dirname, `../../tmp/v3/video/${uuid}.mp4`);
     const file = fs.createWriteStream(outputWebm);
 
-    console.log("Launching browser with resolution:", width, "x", height, width === 3840 ? " (4K)" : " (1080p)");
+    console.log("Launching browser with resolution:", width, "x", height, orientation, width === 3840 ? " (4K)" : " (1080p)");
 
     const browser = await launch({
         dumpio: true,
         // macOS:
         // executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         // linux (docker):
-        executablePath: OPERATING_SYSTEM === "mac" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "/usr/bin/chromium-browser",
+        executablePath: os === "mac" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "/usr/bin/chromium-browser",
         headless: "new", // supports audio!
         // headless: false, // for debugging
         defaultViewport: { width, height },
@@ -151,36 +175,7 @@ async function recordVideoV3() {
 
     await browser.close();
     (await wss).close();
-
-    // Once we're sure the webm file is done, convert it to mp4.
-    // console.log("Starting conversion from WebM to MP4...");
-    // try {
-    //     await convertToMp4(outputWebm, outputMp4);
-    //     console.log("Conversion complete:", outputMp4);
-    // } catch (err) {
-    //     console.error("Error converting file:", err);
-    // }
 }
-
-// function convertToMp4(input, output) {
-//     return new Promise((resolve, reject) => {
-//         // -y: overwrite output file if it exists
-//         // -i: input file
-//         // -c:v: video codec
-//         // -preset: encoding speed
-//         // -crf: quality level (lower is better)
-//         // -r: frame rate (60 FPS)
-//         // -c:a: audio codec
-//         // -b:a: audio bitrate (384 kbps)
-//         const ffmpegCommand = `ffmpeg -y -i "${input}" -c:v libx264 -preset fast -crf 18 -r 60 -c:a aac -b:a 384k "${output}"`;
-//         exec(ffmpegCommand, (error, stdout, stderr) => {
-//             if (error) {
-//                 return reject(error);
-//             }
-//             resolve();
-//         });
-//     });
-// }
 
 recordVideoV3().catch(err => {
     console.error("Error during recording:", err);

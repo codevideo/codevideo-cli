@@ -10,6 +10,7 @@
   "license": "MIT",
   "description": "",
   "dependencies": {
-    "puppeteer-stream": "^3.0.19"
+    "puppeteer-stream": "^3.0.19",
+    "yargs": "^17.7.2"
   }
 }

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 // Config holds all configuration settings for the CLI
@@ -19,25 +21,60 @@ type Config struct {
 	OutputFormat   string
 
 	// Processing settings
-	MaxConcurrentJobs int
-	Resolution        string
+	Resolution  string
+	Orientation string
 
 	// Environment
 	OperatingSystem string
 	Environment     string
 }
 
+// Global configuration pointer
+var GlobalConfig *Config
+
+// Initialize with default configuration
+func init() {
+	GlobalConfig = DefaultConfig()
+}
+
 // DefaultConfig returns the default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		OutputDir:         ".",
-		OutputFileName:    fmt.Sprintf("CodeVideo-%s", time.Now().Format("2006-01-02-15-04-05")),
-		OutputFormat:      "mp4",
-		MaxConcurrentJobs: runtime.NumCPU() / 2, // Use half of available CPUs
-		Resolution:        "1080p",              // 1080p by default, could be 4K
-		OperatingSystem:   runtime.GOOS,
-		Environment:       "local",
+		OutputDir:       ".",
+		OutputFileName:  fmt.Sprintf("CodeVideo-%s", time.Now().Format("2006-01-02-15-04-05")),
+		OutputFormat:    "mp4",
+		Resolution:      "1080p",     // 1080p by default, could be 4K
+		Orientation:     "landscape", // Default to landscape
+		OperatingSystem: runtime.GOOS,
+		Environment:     "local",
 	}
+}
+
+// LoadFromFlags updates the configuration from command flags
+func LoadFromFlags(cmd *cobra.Command) error {
+	// Read output path if provided
+	output, _ := cmd.Flags().GetString("output")
+	if output != "" {
+		GlobalConfig.OutputDir = filepath.Dir(output)
+		GlobalConfig.OutputFileName = filepath.Base(output)
+		// Remove extension if present
+		GlobalConfig.OutputFileName = GlobalConfig.OutputFileName[:len(GlobalConfig.OutputFileName)-len(filepath.Ext(GlobalConfig.OutputFileName))]
+	}
+
+	// Read resolution if provided
+	resolution, _ := cmd.Flags().GetString("resolution")
+	if resolution != "" {
+		GlobalConfig.Resolution = resolution
+	}
+
+	// Read orientation if provided
+	orientation, _ := cmd.Flags().GetString("orientation")
+	if orientation != "" {
+		GlobalConfig.Orientation = orientation
+	}
+
+	// Ensure output directories exist
+	return GlobalConfig.EnsureOutputDirs()
 }
 
 // EnsureOutputDirs ensures that all required output directories exist

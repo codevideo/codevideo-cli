@@ -18,6 +18,7 @@ import (
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/clerk/clerk-sdk-go/v2/user"
+	"github.com/codevideo/codevideo-cli/cli/config"
 	"github.com/codevideo/codevideo-cli/cli/renderer"
 	"github.com/codevideo/codevideo-cli/cloud"
 	"github.com/codevideo/codevideo-cli/constants"
@@ -133,10 +134,8 @@ func ProcessJob(manifestPath string, mode string) {
 	log.Print(message)
 	slack.SendSlackMessage(message)
 
-	operatingSystem := os.Getenv("OPERATING_SYSTEM")
-
 	// Call the Puppeteer script using node with the uuid and operating system as arguments.
-	shouldReturn := RunPuppeteerForUUID(uuid, operatingSystem, mode)
+	shouldReturn := RunPuppeteerForUUID(uuid, mode)
 	if shouldReturn {
 		return
 	}
@@ -285,8 +284,16 @@ func updateClerkUserData(environment string, clerkUserId string, manifestPath st
 	return false
 }
 
-func RunPuppeteerForUUID(uuid string, operatingSystem string, mode string) bool {
-	cmd := exec.Command("node", constants.NODE_SCRIPT_NAME, uuid, operatingSystem)
+func RunPuppeteerForUUID(uuid string, mode string) bool {
+	// Access the global configuration
+	resolution := config.GlobalConfig.Resolution
+	orientation := config.GlobalConfig.Orientation
+
+	cmd := exec.Command("node", constants.NODE_SCRIPT_NAME,
+		"--uuid", uuid,
+		"--os", os.Getenv("OPERATING_SYSTEM"),
+		"--resolution", resolution,
+		"--orientation", orientation)
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {

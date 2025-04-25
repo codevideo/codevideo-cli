@@ -73,6 +73,9 @@ func init() {
 	// --output or -o flag for specifying output file path
 	rootCmd.Flags().StringP("output", "o", "", "Output file path")
 
+	// --orientation or -n flag for specifying video orientation
+	rootCmd.Flags().StringP("orientation", "n", "landscape", "Video orientation (landscape or portrait)")
+
 	// --resolution or -r flag for specifying video resolution
 	rootCmd.Flags().StringP("resolution", "r", "1080p", "Video resolution (1080p or 4K)")
 

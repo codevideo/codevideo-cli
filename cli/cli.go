@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/codevideo/codevideo-cli/cli/config"
 	"github.com/codevideo/codevideo-cli/cli/detector"
 	"github.com/codevideo/codevideo-cli/cli/generator"
 	"github.com/codevideo/codevideo-cli/server"
@@ -16,12 +17,20 @@ import (
 
 // Execute runs the CLI workflow with the provided project data
 func Execute(cmd *cobra.Command) error {
+	// Load configuration from flags
+	if err := config.LoadFromFlags(cmd); err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
 	// Get project JSON data from flags
 	projectJSON, _ := cmd.Flags().GetString("project")
 	if projectJSON == "" {
 		cmd.Help()
 		return nil
 	}
+
+	// Store project JSON in config
+	config.GlobalConfig.ProjectJSON = projectJSON
 
 	// Create a context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())

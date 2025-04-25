@@ -9,3 +9,6 @@ nohup.out
 
 # mp4s generated in CLI mode
 *.mp4
+
+# macOS DS_Store
+.DS_Store

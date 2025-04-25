@@ -6,6 +6,7 @@ type CodeVideoManifest struct {
 	UUID        string      `json:"uuid"`
 	Actions     []Action    `json:"actions"`
 	AudioItems  []AudioItem `json:"audioItems"`
+	FontSizePx  int         `json:"fontSizePx,omitempty"`
 	Error       string      `json:"error,omitempty"`
 }
 
