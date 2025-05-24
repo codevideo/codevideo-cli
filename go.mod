@@ -47,4 +47,5 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
 	golang.org/x/sys v0.20.0 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )

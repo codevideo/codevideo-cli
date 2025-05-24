@@ -2,7 +2,10 @@ package renderer
 
 import (
 	"fmt"
+	"os"
 	"strings"
+
+	slack "github.com/codevideo/go-utils/slack"
 )
 
 // ProgressBar renders a progress bar in the CLI based on a percentage value
@@ -36,6 +39,10 @@ func ProgressBar(percentage float64, totalWidth int) string {
 
 	// Format the percentage (right-aligned)
 	percentStr := fmt.Sprintf(" %3.0f%%", percentage)
+
+	// Send Slack notification of progress
+	environment := strings.ToUpper(os.Getenv("ENVIRONMENT"))
+	slack.SendSlackMessage(fmt.Sprintf("%s: CodeVideo progress: %.0f%% complete", environment, percentage))
 
 	return bar + percentStr
 }

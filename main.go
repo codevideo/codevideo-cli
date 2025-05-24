@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/codevideo/codevideo-cli/cli"
 	"github.com/codevideo/codevideo-cli/cli/staticserver"
@@ -30,14 +34,8 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		// apply logging level before anything
-		verbose, _ := cmd.Flags().GetBool("verbose")
-		if verbose {
-			log.SetLevel(log.DebugLevel)
-			log.Printf("CodeVideo CLI v%s - verbose logging enabled", version)
-		} else {
-			log.SetLevel(log.ErrorLevel)
-		}
+		// Setup logging configuration
+		setupLogging(cmd)
 
 		// for either CLI or server mode, we need to start the required servers:
 		// start static server for the built gatsby files (7001) and the manifest files it needs (7000)
@@ -63,6 +61,45 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// Setup logging with rotatable file output by default
+func setupLogging(cmd *cobra.Command) {
+	verbose, _ := cmd.Flags().GetBool("verbose")
+
+	// Set log level
+	if verbose {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+
+	// Get executable directory for log file location
+	execPath, err := os.Executable()
+	if err != nil {
+		log.Fatalf("Error getting executable path: %v", err)
+	}
+	execDir := filepath.Dir(execPath)
+	logPath := filepath.Join(execDir, "codevideo.log")
+
+	// Setup rotating log file
+	logRotate := &lumberjack.Logger{
+		Filename:   logPath,
+		MaxSize:    10, // MB
+		MaxBackups: 5,
+		MaxAge:     30, // days
+		Compress:   true,
+	}
+
+	// Write to both file and stdout
+	multiWriter := io.MultiWriter(os.Stdout, logRotate)
+	log.SetOutput(multiWriter)
+
+	if verbose {
+		log.Printf("CodeVideo CLI v%s - verbose logging enabled, logs saved to: %s", version, logPath)
+	} else {
+		log.Printf("CodeVideo CLI v%s - logs saved to: %s", version, logPath)
+	}
+}
+
 func init() {
 	// --mode or -m flag for running in server mode
 	rootCmd.Flags().StringP("mode", "m", "", "Run mode (use 'serve' for file watcher mode)")
@@ -84,12 +121,27 @@ func init() {
 
 	// --version or -V flag for displaying version
 	rootCmd.Flags().BoolP("version", "V", false, "Display version information")
+
+	// --open flag for opening the generated MP4 file
+	rootCmd.Flags().Bool("open", false, "Open the generated MP4 file when complete")
 }
 
 func main() {
-	// Load environment variables from .env file.
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+	// Get the executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		log.Fatalf("Error getting executable path: %v", err)
+	}
+
+	// Get the directory of the executable
+	execDir := filepath.Dir(execPath)
+
+	// Try to load .env from the executable directory
+	if err := godotenv.Load(filepath.Join(execDir, ".env")); err != nil {
+		// Fall back to .env.example if .env is not found
+		if err := godotenv.Load(filepath.Join(execDir, ".env.example")); err != nil {
+			log.Printf("Warning: No .env or .env.example file found in %s", execDir)
+		}
 	}
 
 	// Execute the root command

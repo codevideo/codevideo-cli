@@ -12,6 +12,7 @@ import (
 	"github.com/codevideo/codevideo-cli/cli/detector"
 	"github.com/codevideo/codevideo-cli/cli/generator"
 	"github.com/codevideo/codevideo-cli/server"
+	"github.com/codevideo/codevideo-cli/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -44,6 +45,8 @@ func Execute(cmd *cobra.Command) error {
 
 	generator := generator.NewGenerator()
 
+	outputPath, _ := cmd.Flags().GetString("output")
+
 	if course != nil {
 		log.Printf("Starting Course workflow processing")
 		fmt.Println("Detected project type: Course")
@@ -55,7 +58,7 @@ func Execute(cmd *cobra.Command) error {
 			if err != nil {
 				return fmt.Errorf("failed to save manifest: %w", err)
 			}
-			server.ProcessJob(manifestPath, "cli")
+			server.ProcessJob(manifestPath, "cli", outputPath)
 		}
 	}
 
@@ -68,7 +71,7 @@ func Execute(cmd *cobra.Command) error {
 		if err != nil {
 			return fmt.Errorf("failed to save manifest: %w", err)
 		}
-		server.ProcessJob(manifestPath, "cli")
+		server.ProcessJob(manifestPath, "cli", outputPath)
 	}
 
 	if actions != nil {
@@ -80,7 +83,15 @@ func Execute(cmd *cobra.Command) error {
 		if err != nil {
 			return fmt.Errorf("failed to save manifest: %w", err)
 		}
-		server.ProcessJob(manifestPath, "cli")
+		server.ProcessJob(manifestPath, "cli", outputPath)
+	}
+
+	// if the openFile (--open flag) was passed, open it!
+	openFile, _ := cmd.Flags().GetBool("open")
+	if openFile {
+		if err := utils.OpenFile(outputPath); err != nil {
+			return fmt.Errorf("failed to open file: %w", err)
+		}
 	}
 
 	return nil

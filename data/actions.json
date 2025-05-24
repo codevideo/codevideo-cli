@@ -1,0 +1,26 @@
+[
+  {
+    "name": "author-speak-before",
+    "value": "Test 1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Test 2"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Test 3"
+  },
+  {
+    "name": "file-explorer-create-file",
+    "value": "test.txt"
+  },
+  {
+    "name": "file-explorer-open-file",
+    "value": "test.txt"
+  },
+  {
+    "name": "editor-type",
+    "value": "Hello, world!"
+  }
+]

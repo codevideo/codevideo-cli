@@ -5,16 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-
-	log "github.com/sirupsen/logrus"
-
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/clerk/clerk-sdk-go/v2/user"
@@ -89,7 +88,7 @@ func WatchForManifestFiles() {
 							defer func() { <-semaphore }()
 							// Optional delay to ensure the file is fully written.
 							time.Sleep(2 * time.Second)
-							ProcessJob(filePath, "serve")
+							ProcessJob(filePath, "serve", "")
 						}(event.Name)
 						// Clean up the timer from the map.
 						debounceMu.Lock()
@@ -110,7 +109,7 @@ func WatchForManifestFiles() {
 
 // ProcessJob reads the manifest file, calls the Puppeteer script, sends an email if successful,
 // and moves the manifest to the error or success folder.
-func ProcessJob(manifestPath string, mode string) {
+func ProcessJob(manifestPath string, mode string, outputPath string) {
 	// still at 10 from the audio generation step
 	if mode == "cli" {
 		renderer.RenderProgressToConsole(10, "Starting up video recording...")
@@ -130,7 +129,8 @@ func ProcessJob(manifestPath string, mode string) {
 	if err != nil {
 		log.Printf("Failed to get RAM usage: %v", err)
 	}
-	message := fmt.Sprintf("%s: Processing video job: %s (Job has %d actions; RAM usage is at %s)", os.Getenv("ENVIRONMENT"), uuid, len(manifest.Actions), ramUsage)
+	environmentEnv := strings.ToUpper(os.Getenv("ENVIRONMENT"))
+	message := fmt.Sprintf("%s: Processing video job: %s (Job has %d actions; RAM usage is at %s)", environmentEnv, uuid, len(manifest.Actions), ramUsage)
 	log.Print(message)
 	slack.SendSlackMessage(message)
 
@@ -140,16 +140,57 @@ func ProcessJob(manifestPath string, mode string) {
 		return
 	}
 
-	// If the Puppeteer script succeeded, convert the webm file to mp4
-	webmPath := filepath.Join(constants.VIDEO_FOLDER, uuid+".webm")
-	mp4Path := filepath.Join(constants.VIDEO_FOLDER, uuid+".mp4")
-	log.Printf("Converting webm to mp4 for job %s", uuid)
-	if err := utils.ConvertToMp4(webmPath, mp4Path, mode); err != nil {
-		log.Printf("Failed to convert webm to mp4 for job %s: %v", uuid, err)
+	// Get the executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		log.Printf("Failed to get executable path: %v", err)
 		utils.AddErrorToManifest(manifestPath, err.Error())
 		return
 	}
-	log.Printf("Converted webm to mp4 for job %s", uuid)
+	execDir := filepath.Dir(execPath)
+
+	// Create absolute paths for video files
+	videoFolder := filepath.Join(execDir, constants.VIDEO_FOLDER)
+	if err := os.MkdirAll(videoFolder, 0755); err != nil {
+		log.Printf("Failed to create video folder: %v", err)
+		utils.AddErrorToManifest(manifestPath, err.Error())
+		return
+	}
+
+	webmPath := filepath.Join(videoFolder, uuid+".webm")
+
+	// Use the provided outputPath if it's not empty, otherwise use the default
+	var mp4Path string
+	if outputPath != "" {
+		mp4Path = outputPath
+		// Ensure the output directory exists
+		outputDir := filepath.Dir(mp4Path)
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			log.Printf("Failed to create output directory: %v", err)
+			utils.AddErrorToManifest(manifestPath, err.Error())
+			return
+		}
+	} else {
+		mp4Path = filepath.Join(videoFolder, uuid+".mp4")
+	}
+	log.Printf("Converting webm to mp4 for job %s", uuid)
+	// Check if puppeteer succeeded before trying to convert
+	if !RunPuppeteerForUUID(uuid, mode) {
+		log.Printf("Converting webm to mp4 for job %s", uuid)
+
+		if err := utils.ConvertToMp4(webmPath, mp4Path, mode); err != nil {
+			log.Errorf("Failed to convert webm to mp4 for job %s: %v", uuid, err)
+			// Don't proceed further if conversion failed
+			utils.AddErrorToManifest(manifestPath, fmt.Sprintf("Failed to convert video: %v", err))
+			return
+		}
+
+		log.Printf("Converted webm to mp4 for job %s", uuid)
+	} else {
+		log.Printf("Skipping conversion as puppeteer failed for job %s", uuid)
+		utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
+		return
+	}
 
 	// we only need to upload to S3 and update clerk data if we are in serve mode
 	if mode == "serve" {
@@ -195,22 +236,37 @@ func ProcessJob(manifestPath string, mode string) {
 	}
 
 	if mode == "cli" {
-		// copy the mp4 file to the root of this project
-		now := time.Now()
-		formattedTime := now.Format("2006-01-02-15-04-05")
-		finalizedFileName := "CodeVideo-" + formattedTime + ".mp4"
-		if err := utils.CopyFile(mp4Path, filepath.Join(".", finalizedFileName)); err != nil {
-			log.Printf("Failed to copy mp4 file for job %s: %v", uuid, err)
+		// If outputPath is provided, we've already written to that location
+		// Otherwise, copy the mp4 file to the default location
+		if outputPath == "" {
+			// The existing code to copy the mp4 to the default location
+			now := time.Now()
+			formattedTime := now.Format("2006-01-02-15-04-05")
+			finalizedFileName := "CodeVideo-" + formattedTime + ".mp4"
+			finalizedFilePath := filepath.Join(execDir, finalizedFileName)
+
+			// Copy the file to the root directory
+			if err := utils.CopyFile(mp4Path, finalizedFilePath); err != nil {
+				log.Printf("Failed to copy output file: %v", err)
+			}
+
+			fmt.Println()
+			fmt.Println("✅ CodeVideo successfully generated and saved to " + finalizedFileName)
+			fmt.Println()
+		} else {
+			// Just print that the file was generated in the custom location
+			fmt.Println()
+			fmt.Println("✅ CodeVideo successfully generated and saved to " + outputPath)
+			fmt.Println()
 		}
-		fmt.Println()
-		fmt.Println("✅ CodeVideo successfully generated and saved to " + finalizedFileName)
-		fmt.Println()
 	}
 
 	// cleanup: remove the mp4 and webm files, decrement 10 tokens from the user
 
-	if err := os.Remove(mp4Path); err != nil {
-		log.Printf("Failed to remove mp4 file for job %s: %v", uuid, err)
+	if outputPath == "" {
+		if err := os.Remove(mp4Path); err != nil {
+			log.Printf("Failed to remove mp4 file for job %s: %v", uuid, err)
+		}
 	}
 
 	if err := os.Remove(webmPath); err != nil {
@@ -289,7 +345,26 @@ func RunPuppeteerForUUID(uuid string, mode string) bool {
 	resolution := config.GlobalConfig.Resolution
 	orientation := config.GlobalConfig.Orientation
 
-	cmd := exec.Command("node", constants.NODE_SCRIPT_NAME,
+	// Get the executable path
+	execPath, err := os.Executable()
+	if err != nil {
+		log.Printf("Failed to get executable path: %v", err)
+		return true
+	}
+	execDir := filepath.Dir(execPath)
+
+	// Construct the node script path relative to the executable
+	nodeScriptPath := filepath.Join(execDir, constants.NODE_SCRIPT_NAME)
+
+	// Check if the script exists
+	if _, err := os.Stat(nodeScriptPath); os.IsNotExist(err) {
+		log.Fatalf("Node script not found at %s", nodeScriptPath)
+		return true
+	}
+
+	log.Printf("Using node script at: %s", nodeScriptPath)
+
+	cmd := exec.Command("node", nodeScriptPath,
 		"--uuid", uuid,
 		"--os", os.Getenv("OPERATING_SYSTEM"),
 		"--resolution", resolution,

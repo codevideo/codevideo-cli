@@ -4,7 +4,8 @@ type CodeVideoManifest struct {
 	Environment string      `json:"environment"`
 	UserID      string      `json:"userId"`
 	UUID        string      `json:"uuid"`
-	Actions     []Action    `json:"actions"`
+	Actions     []Action    `json:"actions,omitempty"`
+	Lesson      Lesson      `json:"lesson,omitempty"`
 	AudioItems  []AudioItem `json:"audioItems"`
 	FontSizePx  int         `json:"fontSizePx,omitempty"`
 	Error       string      `json:"error,omitempty"`
@@ -49,11 +50,18 @@ func (a ActionsProject) GetType() string {
 	return "Actions"
 }
 
+// CourseSnapshot represents a distinct moment in time during a lesson
+// including the entire IDE state, mouse state, and other UI elements
+// Since this structure is only forwarded to Node scripts and not processed in Go,
+// we use a generic map to avoid having to define every field
+type CourseSnapshot map[string]interface{}
+
 // Lesson represents a lesson project
 type Lesson struct {
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Actions     []Action `json:"actions"`
+	Title           string         `json:"title"`
+	Description     string         `json:"description"`
+	InitialSnapshot CourseSnapshot `json:"initialSnapshot"`
+	Actions         []Action       `json:"actions"`
 }
 
 // GetType implements the Project interface

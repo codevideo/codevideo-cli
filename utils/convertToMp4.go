@@ -3,7 +3,9 @@ package utils
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -17,10 +19,34 @@ import (
 func ConvertToMp4(input, output string, mode string) error {
 	renderer.RenderProgressToConsole(95, "Converting webm to mp4...")
 
+	// Convert input and output to absolute paths if they aren't already
+	inputAbs, err := filepath.Abs(input)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute input path: %v", err)
+	}
+
+	// Check if input file exists
+	if _, err := os.Stat(inputAbs); os.IsNotExist(err) {
+		return fmt.Errorf("input file %s does not exist", inputAbs)
+	}
+
+	outputAbs, err := filepath.Abs(output)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute output path: %v", err)
+	}
+
+	// Ensure the output directory exists
+	outputDir := filepath.Dir(outputAbs)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory %s: %v", outputDir, err)
+	}
+
+	log.Printf("Converting from %s to %s", inputAbs, outputAbs)
+
 	// Construct the ffmpeg command with the -progress flag.
 	cmd := exec.Command("ffmpeg",
-		"-y",        // Overwrite output if exists
-		"-i", input, // Input file
+		"-y",           // Overwrite output if exists
+		"-i", inputAbs, // Input file (absolute path)
 		"-c:v", "libx264", // Video codec
 		"-preset", "fast", // Encoding preset
 		"-crf", "18", // Quality level
@@ -28,8 +54,11 @@ func ConvertToMp4(input, output string, mode string) error {
 		"-c:a", "aac", // Audio codec
 		"-b:a", "384k", // Audio bitrate
 		"-progress", "pipe:1", // Send progress info to stdout
-		output, // Output file
+		outputAbs, // Output file (absolute path)
 	)
+
+	// Log the full command for debugging
+	log.Printf("Executing command: %s", cmd.String())
 
 	// Get a pipe to read ffmpeg's stdout.
 	stdoutPipe, err := cmd.StdoutPipe()

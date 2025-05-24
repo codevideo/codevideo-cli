@@ -56,7 +56,18 @@ func (g *Generator) GenerateFromActions(actions []types.Action) *types.CodeVideo
 
 // GenerateFromLesson creates a manifest from a lesson
 func (g *Generator) GenerateFromLesson(lesson types.Lesson) *types.CodeVideoManifest {
-	return g.GenerateFromActions(lesson.Actions)
+	audioItems, err := generateAudioItems(lesson.Actions)
+	if err != nil {
+		log.Fatalf("Error generating audio items: %v", err)
+	}
+
+	return &types.CodeVideoManifest{
+		Environment: g.Environment,
+		UserID:      g.UserID,
+		UUID:        uuid.New().String(),
+		Lesson:      lesson,
+		AudioItems:  audioItems,
+	}
 }
 
 // GenerateFromCourse creates multiple manifests from a course, one for each lesson
@@ -75,19 +86,30 @@ func (g *Generator) SaveManifest(manifest *types.CodeVideoManifest) (string, err
 	// Marshal the manifest to JSON
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	// Get executable directory
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %w", err)
+	}
+	execDir := filepath.Dir(execPath)
+
+	// Create absolute path to NEW_FOLDER directory relative to executable
+	newFolderPath := filepath.Join(execDir, constants.NEW_FOLDER)
+
+	// Ensure directory exists
+	if err := os.MkdirAll(newFolderPath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory %s: %w", newFolderPath, err)
 	}
 
 	// Generate the file path
-	absoluteNewDir, err := filepath.Abs(constants.NEW_FOLDER)
-	if err != nil {
-		return "", err
-	}
-	filePath := filepath.Join(absoluteNewDir, manifest.UUID+".json")
+	filePath := filepath.Join(newFolderPath, manifest.UUID+".json")
 
 	// Write the file
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to write manifest file: %w", err)
 	}
 
 	return filePath, nil
