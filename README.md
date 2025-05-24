@@ -6,38 +6,23 @@ The CLI tool for generating CodeVideos.
 
 ### Download Pre-built Binaries
 
-1. Go to the [Releases page](https://github.com/codevideo/codevideo-cli/releases)
-2. Download the appropriate binary for your system:
-   - **Windows (64-bit Intel/AMD)**: `codevideo-cli-windows-amd64.exe`
-   - **Windows (ARM64)**: `codevideo-cli-windows-arm64.exe`
-   - **Linux (64-bit Intel/AMD)**: `codevideo-cli-linux-amd64`
-   - **Linux (ARM64)**: `codevideo-cli-linux-arm64`
-   - **macOS (Intel)**: `codevideo-cli-darwin-amd64`
-   - **macOS (Apple Silicon)**: `codevideo-cli-darwin-arm64`
+1. Go to the [Releases page](https://github.com/codevideo/codevideo-cli/releases) and download the appropriate binary for your operating system and architecture.
 
-3. Make the binary executable (Linux/macOS only):
-   ```bash
-   chmod +x codevideo-cli-*
-   ```
+2. Make the binary executable (Linux/macOS only):
 
-4. Optionally, rename and move to your PATH:
-   ```bash
-   # Linux/macOS - rename and move to system bin
-   sudo mv codevideo-cli-* /usr/local/bin/codevideo
-   
-   # Or add to your user bin
-   mkdir -p ~/bin
-   mv codevideo-cli-* ~/bin/codevideo
-   ```
+```shell
+chmod +x codevideo-cli-*
+```
 
-### Quick Install Script
+3. Move the binary to a directory in your `PATH`:
 
-**Linux/macOS:**
-```bash
-curl -s https://api.github.com/repos/codevideo/codevideo-cli/releases/latest \
-| grep "browser_download_url.*$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" \
-| cut -d '"' -f 4 \
-| xargs curl -L -o codevideo && chmod +x codevideo
+```shell
+mv codevideo-cli-* /usr/local/bin/codevideo
+```
+4. Verify the installation by running:
+
+```shell
+codevideo --version
 ```
 
 ### Build from Source
@@ -55,10 +40,13 @@ go build -o codevideo
 Create a `.env` file in the same directory as your binary (or in your working directory):
 
 ```env
-# Copy from .env.example and fill in your values
 ELEVENLABS_API_KEY=your-elevenlabs-api-key
-# ... other configuration options
+ELEVENLABS_VOICE_ID=your-elevenlabs-voice-id
 ```
+
+The S3, Clerk, and Mailjet variables are only used in server mode and are not required for CLI usage.
+
+The slack variable can be used to send notifications when a video is generated, but it is not required.
 
 The application will automatically load this `.env` file when started.
 
@@ -71,7 +59,7 @@ If you don't have an Elevenlabs account - we're working on a solution with htgo-
 2. Try a simple example video generation:
 
 ```shell
-codevideo -p "[{\"name\":\"author-speak-before\",\"value\":\"Let's learn how to use the print function in Python!\"},{\"name\":\"author-speak-before\",\"value\":\"First, let's make a Python file.\"},{\"name\":\"file-explorer-create-file\",\"value\":\"main.py\"},{\"name\":\"file-explorer-open-file\",\"value\":\"main.py\"},{\"name\":\"author-speak-before\",\"value\":\"and let's print 'Hello world!' to the console.\"},{\"name\":\"editor-type\",\"value\":\"print('Hello, world!')\"}]"
+./codevideo -p "[{\"name\":\"author-speak-before\",\"value\":\"Let's learn how to use the print function in Python!\"},{\"name\":\"author-speak-before\",\"value\":\"First, let's make a Python file.\"},{\"name\":\"file-explorer-create-file\",\"value\":\"main.py\"},{\"name\":\"file-explorer-open-file\",\"value\":\"main.py\"},{\"name\":\"author-speak-before\",\"value\":\"and let's print 'Hello world!' to the console.\"},{\"name\":\"editor-type\",\"value\":\"print('Hello, world!')\"}]"
 ```
 
 Note: if you are using `zsh` and get the error `zsh: event not found: \`, try deactivating history expansion with `set +o histexpand` and try the command again.
@@ -90,25 +78,25 @@ As an alternative, paste your actions, lesson, or course JSON into `data/actions
 With actions:
 
 ```shell
-codevideo -p "$(cat data/actions.json)"
+./codevideo -p "$(cat data/actions.json)"
 ```
 
 With a lesson:
 
 ```shell
-codevideo -p "$(cat data/lesson.json)"
+./codevideo -p "$(cat data/lesson.json)"
 ```
 
 With a course:
 
 ```shell
-codevideo -p "$(cat data/course.json)"
+./codevideo -p "$(cat data/course.json)"
 ```
 
 ## Complex CLI Example - Actions, With Given Output Path, and Open when Done
 
 ```shell
-codevideo -p "$(cat data/actions.json)" -o mysuperspecialvideo.mp4 --open
+./codevideo -p "$(cat data/actions.json)" -o mysuperspecialvideo.mp4 --open
 ```
 
 ## Server usage:
@@ -116,13 +104,13 @@ codevideo -p "$(cat data/actions.json)" -o mysuperspecialvideo.mp4 --open
 Simply pass the `-m serve` parameter to the command to start the server:
 
 ```shell
-codevideo -m serve
+./codevideo -m serve
 ```
 
 To run in the background use `nohup` or similar:
 
 ```shell
-nohup codevideo -m serve &
+nohup ./codevideo -m serve &
 ```
 
 ## Docker 
@@ -130,7 +118,7 @@ nohup codevideo -m serve &
 Build the container
 
 ```shell
-docker build -t codevideo .
+docker build -t ./codevideo .
 ```
 
 Run in server mode (default)

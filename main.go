@@ -19,7 +19,7 @@ import (
 )
 
 // const for version string
-const version = "0.0.2"
+const version = "0.0.3"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -30,7 +30,7 @@ var rootCmd = &cobra.Command{
 		// Check for version flag first
 		showVersion, _ := cmd.Flags().GetBool("version")
 		if showVersion {
-			fmt.Printf("CodeVideo CLI v%s\n\n✨Sufficiently advanced technology is indistinguishable from magic.✨", version)
+			fmt.Printf("/> CodeVideo CLI v%s\n\n✨Sufficiently advanced technology is indistinguishable from magic.✨", version)
 			return
 		}
 
@@ -94,9 +94,9 @@ func setupLogging(cmd *cobra.Command) {
 	log.SetOutput(multiWriter)
 
 	if verbose {
-		log.Printf("CodeVideo CLI v%s - verbose logging enabled, logs saved to: %s", version, logPath)
+		log.Printf("/> CodeVideo CLI v%s - verbose logging enabled, logs saved to: %s", version, logPath)
 	} else {
-		log.Printf("CodeVideo CLI v%s - logs saved to: %s", version, logPath)
+		log.Printf("/> CodeVideo CLI v%s - logs saved to: %s", version, logPath)
 	}
 }
 
