@@ -1,0 +1,82 @@
+[
+  {
+    "name": "author-speak-before",
+    "value": "本课将展示我们如何快速将 CodeVideo 视频转换成不同的语言！例如，我们将学习 Python 中的 for 循环。"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "首先，我们来创建并打开一个名为 main.py 的文件。"
+  },
+  {
+    "name": "mouse-move-file-explorer",
+    "value": "1"
+  },
+  {
+    "name": "mouse-right-click",
+    "value": "1"
+  },
+  {
+    "name": "mouse-move-file-explorer-context-menu-new-file",
+    "value": "1"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "file-explorer-type-new-file-input",
+    "value": "main.py"
+  },
+  {
+    "name": "file-explorer-enter-new-file-input",
+    "value": "1"
+  },
+  {
+    "name": "editor-type",
+    "value": "# 我们将使用 for 循环打印五次“你好，世界！”\n"
+  },
+  {
+    "name": "editor-type",
+    "value": "for i in range(5):"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "我们使用 'for i in range' 这种结构。在这里，我们想循环五次，因此调用 range(5)。"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "现在，我们用 print 函数来输出“你好，世界！”。"
+  },
+  {
+    "name": "editor-type",
+    "value": "\n    print(\"你好，世界！\")"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "现在我们打开终端并运行这个脚本。"
+  },
+  {
+    "name": "terminal-open",
+    "value": "1"
+  },
+  {
+    "name": "terminal-type",
+    "value": "python main.py"
+  },
+  {
+    "name": "terminal-enter",
+    "value": "1"
+  },
+  {
+    "name": "terminal-set-output",
+    "value": "你好，世界！\n你好，世界！\n你好，世界！\n你好，世界！\n你好，世界！"
+  },
+  {
+    "name": "terminal-enter",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "太棒了！这就是你在 Python 中编写 for 循环的方法。"
+  }
+]

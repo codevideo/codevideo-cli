@@ -12,6 +12,7 @@ import (
 	"github.com/codevideo/codevideo-cli/cli/detector"
 	"github.com/codevideo/codevideo-cli/cli/generator"
 	"github.com/codevideo/codevideo-cli/server"
+	"github.com/codevideo/codevideo-cli/types"
 	"github.com/codevideo/codevideo-cli/utils"
 	"github.com/spf13/cobra"
 )
@@ -33,6 +34,17 @@ func Execute(cmd *cobra.Command) error {
 	// Store project JSON in config
 	config.GlobalConfig.ProjectJSON = projectJSON
 
+	// Load and validate config file if provided
+	var ideProps *types.CodeVideoIDEProps
+	if config.GlobalConfig.ConfigFilePath != "" {
+		var err error
+		ideProps, err = config.LoadConfigFile(config.GlobalConfig.ConfigFilePath)
+		if err != nil {
+			return fmt.Errorf("config validation failed: %w", err)
+		}
+		log.Printf("Loaded config from: %s", config.GlobalConfig.ConfigFilePath)
+	}
+
 	// Create a context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	setupCancellation(ctx, cancel)
@@ -44,6 +56,9 @@ func Execute(cmd *cobra.Command) error {
 	}
 
 	generator := generator.NewGenerator()
+	if ideProps != nil {
+		generator.IDEProps = ideProps
+	}
 
 	outputPath, _ := cmd.Flags().GetString("output")
 

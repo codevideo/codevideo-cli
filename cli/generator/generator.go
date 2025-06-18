@@ -17,28 +17,54 @@ import (
 	"github.com/codevideo/codevideo-cli/types"
 	"github.com/codevideo/codevideo-cli/utils"
 	"github.com/google/uuid"
+
+	slack "github.com/codevideo/go-utils/slack"
 )
 
 // Generator handles the creation of CodeVideo manifests
 type Generator struct {
 	Environment string
-	UserID      string // Local user ID or anonymous for CLI use
+	UserID      string
+	IDEProps    *types.CodeVideoIDEProps
 }
 
 // NewGenerator creates a new manifest generator
 func NewGenerator() *Generator {
 	// For local use, we'll generate a random user ID
 	// In the future, this could be tied to a local config file or login
-	userID := uuid.New().String()
+	// userID := uuid.New().String()
 
 	return &Generator{
-		Environment: os.Getenv("ENVIRONMENT"),
-		UserID:      userID,
+		Environment: strings.ToUpper(os.Getenv("ENVIRONMENT")),
+		UserID:      "local-cli-user",
+		IDEProps:    nil, // Will be set when config is loaded
 	}
 }
 
 // GenerateFromActions creates a manifest from a list of actions
 func (g *Generator) GenerateFromActions(actions []types.Action) *types.CodeVideoManifest {
+	// Generate a unique UUID for this manifest
+	uuid := uuid.New().String()
+
+	// Slack log a nice "/> CodeVideo" logo
+	logo := `
+
+
+/>\ CodeVideo CLI
+
+
+`
+	log.Print(logo)
+	slack.SendSlackMessage(logo)
+
+	ramUsage, err := utils.GetRAMUsage()
+	if err != nil {
+		log.Printf("Failed to get RAM usage: %v", err)
+	}
+	environmentEnv := strings.ToUpper(os.Getenv("ENVIRONMENT"))
+	message := fmt.Sprintf("%s: Processing video job: %s (Job has %d actions; RAM usage is at %s)", environmentEnv, uuid, len(actions), ramUsage)
+	log.Print(message)
+	slack.SendSlackMessage(message)
 
 	audioItems, err := generateAudioItems(actions)
 	if err != nil {
@@ -46,11 +72,12 @@ func (g *Generator) GenerateFromActions(actions []types.Action) *types.CodeVideo
 	}
 
 	return &types.CodeVideoManifest{
-		Environment: g.Environment,
-		UserID:      g.UserID,
-		UUID:        uuid.New().String(),
-		Actions:     actions,
-		AudioItems:  audioItems,
+		Environment:       g.Environment,
+		UserID:            g.UserID,
+		UUID:              uuid,
+		Actions:           actions,
+		AudioItems:        audioItems,
+		CodeVideoIDEProps: g.IDEProps,
 	}
 }
 
@@ -62,11 +89,12 @@ func (g *Generator) GenerateFromLesson(lesson types.Lesson) *types.CodeVideoMani
 	}
 
 	return &types.CodeVideoManifest{
-		Environment: g.Environment,
-		UserID:      g.UserID,
-		UUID:        uuid.New().String(),
-		Lesson:      lesson,
-		AudioItems:  audioItems,
+		Environment:       g.Environment,
+		UserID:            g.UserID,
+		UUID:              uuid.New().String(),
+		Lesson:            lesson,
+		AudioItems:        audioItems,
+		CodeVideoIDEProps: g.IDEProps,
 	}
 }
 

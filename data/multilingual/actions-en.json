@@ -1,0 +1,82 @@
+[
+  {
+    "name": "author-speak-before",
+    "value": "This lesson is to show how quickly we can convert CodeVideo videos into different languages! As an example, we'll be learning about for loops in python."
+  },
+  {
+    "name": "author-speak-before",
+    "value": "First, let's create and open a main.py file."
+  },
+  {
+    "name": "mouse-move-file-explorer",
+    "value": "1"
+  },
+  {
+    "name": "mouse-right-click",
+    "value": "1"
+  },
+  {
+    "name": "mouse-move-file-explorer-context-menu-new-file",
+    "value": "1"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "file-explorer-type-new-file-input",
+    "value": "main.py"
+  },
+  {
+    "name": "file-explorer-enter-new-file-input",
+    "value": "1"
+  },
+  {
+    "name": "editor-type",
+    "value": "# We'll print \"Hello, World!\" five times using a for loop\n"
+  },
+  {
+    "name": "editor-type",
+    "value": "for i in range(5):"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "We use the 'for i in range' pattern. And in this case, since we want to loop 5 times, we call range 5"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Now, let's print out 'Hello world' using the print function. "
+  },
+  {
+    "name": "editor-type",
+    "value": "\n    print(\"Hello, World!\")"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Let's open up a terminal now and run this script."
+  },
+  {
+    "name": "terminal-open",
+    "value": "1"
+  },
+  {
+    "name": "terminal-type",
+    "value": "python main.py"
+  },
+  {
+    "name": "terminal-enter",
+    "value": "1"
+  },
+  {
+    "name": "terminal-set-output",
+    "value": "Hello, world!\nHello, world!\nHello, world!\nHello, world!\nHello, world!"
+  },
+  {
+    "name": "terminal-enter",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Perfect! That's how you can write for loops in Python."
+  }
+]

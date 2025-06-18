@@ -125,18 +125,11 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 	uuid := manifest.UUID
 	clerkUserId := manifest.UserID
 
-	ramUsage, err := utils.GetRAMUsage()
-	if err != nil {
-		log.Printf("Failed to get RAM usage: %v", err)
-	}
-	environmentEnv := strings.ToUpper(os.Getenv("ENVIRONMENT"))
-	message := fmt.Sprintf("%s: Processing video job: %s (Job has %d actions; RAM usage is at %s)", environmentEnv, uuid, len(manifest.Actions), ramUsage)
-	log.Print(message)
-	slack.SendSlackMessage(message)
-
 	// Call the Puppeteer script using node with the uuid and operating system as arguments.
-	shouldReturn := RunPuppeteerForUUID(uuid, mode)
-	if shouldReturn {
+	puppeteerFailed := RunPuppeteerForUUID(uuid, mode)
+	if puppeteerFailed {
+		log.Printf("Puppeteer recording failed for job %s", uuid)
+		utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
 		return
 	}
 
@@ -173,24 +166,16 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 	} else {
 		mp4Path = filepath.Join(videoFolder, uuid+".mp4")
 	}
+
+	// Puppeteer succeeded, now convert to mp4
 	log.Printf("Converting webm to mp4 for job %s", uuid)
-	// Check if puppeteer succeeded before trying to convert
-	if !RunPuppeteerForUUID(uuid, mode) {
-		log.Printf("Converting webm to mp4 for job %s", uuid)
-
-		if err := utils.ConvertToMp4(webmPath, mp4Path, mode); err != nil {
-			log.Errorf("Failed to convert webm to mp4 for job %s: %v", uuid, err)
-			// Don't proceed further if conversion failed
-			utils.AddErrorToManifest(manifestPath, fmt.Sprintf("Failed to convert video: %v", err))
-			return
-		}
-
-		log.Printf("Converted webm to mp4 for job %s", uuid)
-	} else {
-		log.Printf("Skipping conversion as puppeteer failed for job %s", uuid)
-		utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
+	if err := utils.ConvertToMp4(webmPath, mp4Path, mode); err != nil {
+		log.Errorf("Failed to convert webm to mp4 for job %s: %v", uuid, err)
+		utils.AddErrorToManifest(manifestPath, fmt.Sprintf("Failed to convert video: %v", err))
 		return
 	}
+
+	log.Printf("Converted webm to mp4 for job %s", uuid)
 
 	// we only need to upload to S3 and update clerk data if we are in serve mode
 	if mode == "serve" {
@@ -213,7 +198,7 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 
 		// use the clerk userID to get the email address of the user
 		// be sure to initialize the clerk client with the correct API key according to whether the environment of the job is staging or prod
-		shouldReturn = updateClerkUserData(environment, clerkUserId, manifestPath, mp4Url, uuid, base)
+		shouldReturn := updateClerkUserData(environment, clerkUserId, manifestPath, mp4Url, uuid, base)
 		if shouldReturn {
 			return
 		}
@@ -224,7 +209,7 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 		log.Printf("Failed to move manifest to success folder: %v", err)
 	} else {
 		log.Printf("Job %s processed successfully", uuid)
-		ramUsage, err = utils.GetRAMUsage()
+		ramUsage, err := utils.GetRAMUsage()
 		if err != nil {
 			log.Printf("Failed to get RAM usage: %v", err)
 		}

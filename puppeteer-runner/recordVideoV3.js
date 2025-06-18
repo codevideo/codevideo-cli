@@ -76,7 +76,7 @@ async function recordVideoV3() {
             '--autoplay-policy=no-user-gesture-required',
             // '--disable-web-security',
             // '--enable-logging=stderr',  // Enable detailed logging
-            // '--v=1',                    // Increase verbosity level
+            '--v=1',                    // Increase verbosity level
         ],
     });
 

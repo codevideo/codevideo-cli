@@ -1,12 +1,14 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
 
+	"github.com/codevideo/codevideo-cli/types"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +29,9 @@ type Config struct {
 	// Environment
 	OperatingSystem string
 	Environment     string
+
+	// Config file path
+	ConfigFilePath string
 }
 
 // Global configuration pointer
@@ -73,6 +78,12 @@ func LoadFromFlags(cmd *cobra.Command) error {
 		GlobalConfig.Orientation = orientation
 	}
 
+	// Read config file path if provided
+	configPath, _ := cmd.Flags().GetString("config")
+	if configPath != "" {
+		GlobalConfig.ConfigFilePath = configPath
+	}
+
 	// Ensure output directories exist
 	return GlobalConfig.EnsureOutputDirs()
 }
@@ -113,4 +124,39 @@ func (c *Config) GenerateOutputPath(suffix string) string {
 		filename = fmt.Sprintf("%s-%s", filename, suffix)
 	}
 	return filepath.Join(c.OutputDir, fmt.Sprintf("%s.%s", filename, c.OutputFormat))
+}
+
+// LoadConfigFile loads and parses the configuration file
+func LoadConfigFile(configPath string) (*types.CodeVideoIDEProps, error) {
+	if configPath == "" {
+		return nil, nil
+	}
+
+	// Check if file exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("config file not found: %s", configPath)
+	}
+
+	// Read file
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	// Parse JSON
+	var config types.CodeVideoIDEProps
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse config JSON: %w", err)
+	}
+
+	// Validate required fields
+	if config.Theme != "light" && config.Theme != "dark" {
+		return nil, fmt.Errorf("theme must be 'light' or 'dark', got: %s", config.Theme)
+	}
+
+	if config.DefaultLanguage == "" {
+		return nil, fmt.Errorf("defaultLanguage is required")
+	}
+
+	return &config, nil
 }

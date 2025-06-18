@@ -1,0 +1,82 @@
+[
+  {
+    "name": "author-speak-before",
+    "value": "Esta aula é para mostrar como podemos converter rapidamente vídeos do CodeVideo para outros idiomas! Como exemplo, vamos aprender sobre loops for em Python."
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Primeiro, vamos criar e abrir um arquivo chamado main.py."
+  },
+  {
+    "name": "mouse-move-file-explorer",
+    "value": "1"
+  },
+  {
+    "name": "mouse-right-click",
+    "value": "1"
+  },
+  {
+    "name": "mouse-move-file-explorer-context-menu-new-file",
+    "value": "1"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "file-explorer-type-new-file-input",
+    "value": "main.py"
+  },
+  {
+    "name": "file-explorer-enter-new-file-input",
+    "value": "1"
+  },
+  {
+    "name": "editor-type",
+    "value": "# Vamos imprimir \"Olá, Mundo!\" cinco vezes usando um loop for\n"
+  },
+  {
+    "name": "editor-type",
+    "value": "for i in range(5):"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Usamos o padrão 'for i in range'. E nesse caso, como queremos repetir 5 vezes, chamamos range com 5."
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Agora, vamos imprimir 'Olá, Mundo' usando a função print."
+  },
+  {
+    "name": "editor-type",
+    "value": "\n    print(\"Olá, Mundo!\")"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Agora vamos abrir o terminal e executar esse script."
+  },
+  {
+    "name": "terminal-open",
+    "value": "1"
+  },
+  {
+    "name": "terminal-type",
+    "value": "python main.py"
+  },
+  {
+    "name": "terminal-enter",
+    "value": "1"
+  },
+  {
+    "name": "terminal-set-output",
+    "value": "Olá, Mundo!\nOlá, Mundo!\nOlá, Mundo!\nOlá, Mundo!\nOlá, Mundo!"
+  },
+  {
+    "name": "terminal-enter",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Perfeito! É assim que você escreve loops for em Python."
+  }
+]

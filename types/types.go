@@ -1,14 +1,15 @@
 package types
 
 type CodeVideoManifest struct {
-	Environment string      `json:"environment"`
-	UserID      string      `json:"userId"`
-	UUID        string      `json:"uuid"`
-	Actions     []Action    `json:"actions,omitempty"`
-	Lesson      Lesson      `json:"lesson,omitempty"`
-	AudioItems  []AudioItem `json:"audioItems"`
-	FontSizePx  int         `json:"fontSizePx,omitempty"`
-	Error       string      `json:"error,omitempty"`
+	Environment       string             `json:"environment"`
+	UserID            string             `json:"userId"`
+	UUID              string             `json:"uuid"`
+	Actions           []Action           `json:"actions,omitempty"`
+	Lesson            Lesson             `json:"lesson,omitempty"`
+	AudioItems        []AudioItem        `json:"audioItems"`
+	FontSizePx        int                `json:"fontSizePx,omitempty"`
+	Error             string             `json:"error,omitempty"`
+	CodeVideoIDEProps *CodeVideoIDEProps `json:"codeVideoIDEProps,omitempty"`
 }
 
 // Configuration holds all CLI configuration
@@ -88,4 +89,33 @@ type CodeVideoUserMetadata struct {
 	SubscriptionPlan   string `json:"subscriptionPlan"`
 	SubscriptionStatus string `json:"subscriptionStatus"`
 	TokensPerCycle     int    `json:"tokensPerCycle"`
+}
+
+type CodeVideoIDEProps struct {
+	Theme                    string             `json:"theme"` // 'light' | 'dark'
+	Project                  Project            `json:"project"`
+	Mode                     string             `json:"mode"` // GUIMode equivalent
+	AllowFocusInEditor       bool               `json:"allowFocusInEditor"`
+	CurrentActionIndex       int                `json:"currentActionIndex"`
+	CurrentLessonIndex       *int               `json:"currentLessonIndex"`
+	DefaultLanguage          string             `json:"defaultLanguage"`
+	IsExternalBrowserStepUrl *string            `json:"isExternalBrowserStepUrl"`
+	IsSoundOn                bool               `json:"isSoundOn"`
+	WithCaptions             bool               `json:"withCaptions"`
+	SpeakActionAudios        []SpeakActionAudio `json:"speakActionAudios"`
+	FileExplorerWidth        *int               `json:"fileExplorerWidth,omitempty"`
+	TerminalHeight           *int               `json:"terminalHeight,omitempty"`
+	MouseColor               *string            `json:"mouseColor,omitempty"`
+	FontSizePx               *int               `json:"fontSizePx,omitempty"`
+	IsEmbedMode              *bool              `json:"isEmbedMode,omitempty"`
+	IsFileExplorerVisible    *bool              `json:"isFileExplorerVisible,omitempty"`
+	IsTerminalVisible        *bool              `json:"isTerminalVisible,omitempty"`
+	KeyboardTypingPauseMs    *int               `json:"keyboardTypingPauseMs,omitempty"`
+	StandardPauseMs          *int               `json:"standardPauseMs,omitempty"`
+	LongPauseMs              *int               `json:"longPauseMs,omitempty"`
+}
+
+type SpeakActionAudio struct {
+	Text   string `json:"text"`
+	Mp3Url string `json:"mp3Url"`
 }

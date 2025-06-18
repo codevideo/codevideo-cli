@@ -1,0 +1,82 @@
+[
+  {
+    "name": "author-speak-before",
+    "value": "In dieser Lektion zeige ich dir, wie schnell wir CodeVideo-Videos in andere Sprachen übersetzen können! Als Beispiel lernen wir etwas über for-Schleifen in Python."
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Zuerst erstellen und öffnen wir eine main.py-Datei."
+  },
+  {
+    "name": "mouse-move-file-explorer",
+    "value": "1"
+  },
+  {
+    "name": "mouse-right-click",
+    "value": "1"
+  },
+  {
+    "name": "mouse-move-file-explorer-context-menu-new-file",
+    "value": "1"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "file-explorer-type-new-file-input",
+    "value": "main.py"
+  },
+  {
+    "name": "file-explorer-enter-new-file-input",
+    "value": "1"
+  },
+  {
+    "name": "editor-type",
+    "value": "# Wir geben \"Hallo, Welt!\" fünfmal mit einer for-Schleife aus\n"
+  },
+  {
+    "name": "editor-type",
+    "value": "for i in range(5):"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Wir verwenden das Muster 'for i in range'. Und in diesem Fall rufen wir range mit 5 auf, da wir fünfmal durchlaufen möchten."
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Jetzt geben wir 'Hallo, Welt!' mit der print-Funktion aus."
+  },
+  {
+    "name": "editor-type",
+    "value": "\n    print(\"Hallo, Welt!\")"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Jetzt öffnen wir ein Terminal und führen dieses Skript aus."
+  },
+  {
+    "name": "terminal-open",
+    "value": "1"
+  },
+  {
+    "name": "terminal-type",
+    "value": "python main.py"
+  },
+  {
+    "name": "terminal-enter",
+    "value": "1"
+  },
+  {
+    "name": "terminal-set-output",
+    "value": "Hallo, Welt!\nHallo, Welt!\nHallo, Welt!\nHallo, Welt!\nHallo, Welt!"
+  },
+  {
+    "name": "terminal-enter",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Perfekt! So schreibt man for-Schleifen in Python."
+  }
+]

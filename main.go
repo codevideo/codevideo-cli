@@ -124,6 +124,9 @@ func init() {
 
 	// --open flag for opening the generated MP4 file
 	rootCmd.Flags().Bool("open", false, "Open the generated MP4 file when complete")
+
+	// --config or -c flag for specifying config JSON file path
+	rootCmd.Flags().StringP("config", "c", "", "Path to config JSON file")
 }
 
 func main() {

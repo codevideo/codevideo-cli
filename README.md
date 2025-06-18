@@ -1,4 +1,4 @@
-# codevideo-cli
+# codevideo
 
 The CLI tool for generating CodeVideos.
 
@@ -8,85 +8,49 @@ The CLI tool for generating CodeVideos.
 
 ```bash
 brew tap codevideo/codevideo
-brew install codevideo-cli
+brew install codevideo
 ```
 
-After installation, use the tool as `codevideo-cli`:
+After installation, use the tool as `codevideo`:
 
 ```bash
-codevideo-cli --help
+codevideo --help
 ```
 
 ### Option 2: Download Pre-built Binaries
 
-1. Go to the [Releases page](https://github.com/codevideo/codevideo-cli/releases)
-2. Download the appropriate binary for your system:
-   - **Windows (64-bit Intel/AMD)**: `codevideo-cli-windows-amd64.exe`
-   - **Windows (ARM64)**: `codevideo-cli-windows-arm64.exe`
-   - **Linux (64-bit Intel/AMD)**: `codevideo-cli-linux-amd64`
-   - **Linux (ARM64)**: `codevideo-cli-linux-arm64`
-   - **macOS (Intel)**: `codevideo-cli-darwin-amd64`
-   - **macOS (Apple Silicon)**: `codevideo-cli-darwin-arm64`
+1. Go to the [Releases page](https://github.com/codevideo/codevideo/releases) and download the appropriate binary for your OS:
 
-3. Make the binary executable (Linux/macOS only):
-   ```bash
-   chmod +x codevideo-cli-*
-   ```
+2. Make the binary executable (Linux/macOS only):
 
-4. Optionally, rename and move to your PATH:
-   ```bash
-   # Linux/macOS - rename and move to system bin
-   sudo mv codevideo-cli-* /usr/local/bin/codevideo-cli
-   
-   # Or add to your user bin
-   mkdir -p ~/bin
-   mv codevideo-cli-* ~/bin/codevideo-cli
-   ```
-
-#### macOS Security Notice
-
-When you first run the binary on macOS, you may see a security warning: "Apple cannot verify that this software is free of malware." This is normal for unsigned binaries. To fix this:
-
-**Option 1: Right-click method**
-1. Right-click (or Ctrl+click) on the binary file
-2. Select "Open" from the context menu
-3. Click "Open" in the security dialog that appears
-4. The binary will now run normally in the future
-
-**Option 2: System Preferences method**
-1. Try to run the binary normally (it will be blocked)
-2. Go to System Preferences → Security & Privacy → General
-3. You'll see a message about the blocked app with an "Allow Anyway" button
-4. Click "Allow Anyway" and try running the binary again
-
-**Option 3: Command line override**
 ```bash
-sudo xattr -rd com.apple.quarantine codevideo-cli-darwin-arm64
+chmod +x codevideo-*
 ```
 
-### Option 3: Quick Install Script
+3. Optionally, rename and move to your PATH:
 
-**Linux/macOS:**
 ```bash
-curl -s https://api.github.com/repos/codevideo/codevideo-cli/releases/latest \
-| grep "browser_download_url.*$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)" \
-| cut -d '"' -f 4 \
-| xargs curl -L -o codevideo-cli && chmod +x codevideo-cli
+# Linux/macOS - rename and move to system bin
+sudo mv codevideo-* /usr/local/bin/codevideo
+
+# Or add to your user bin
+mkdir -p ~/bin
+mv codevideo-* ~/bin/codevideo
 ```
 
-### Option 4: Build from Source
+### Option 3: Build from Source
 
 If you prefer to build from source or need the latest development version:
 
 ```shell
-git clone https://github.com/codevideo/codevideo-cli
-cd codevideo-cli
-go build -o codevideo-cli
+git clone https://github.com/codevideo/codevideo
+cd codevideo
+go build -o codevideo
 ```
 
 ## Configuration
 
-Create a `.env` file in your **working directory** (the directory where you plan to run codevideo-cli):
+Create a `.env` file in your **working directory** (the directory where you plan to run codevideo):
 
 ```env
 # Copy from .env.example and fill in your values
@@ -102,22 +66,23 @@ ELEVENLABS_API_KEY=your-elevenlabs-api-key
    ```bash
    cd /path/to/your/project
    echo "ELEVENLABS_API_KEY=your-key" > .env
-   codevideo-cli -p "your-actions"
+   codevideo -p "your-actions"
    ```
 
 2. **Global environment variables:**
    ```bash
    export ELEVENLABS_API_KEY=your-key
-   codevideo-cli -p "your-actions"
+   codevideo -p "your-actions"
    ```
 
 3. **Home directory .env file:**
    ```bash
    echo "ELEVENLABS_API_KEY=your-key" > ~/.env
-   cd ~ && codevideo-cli -p "your-actions"
+   cd ~ && codevideo -p "your-actions"
    ```
 
 ## Usage
+
 1. Create your `.env` file with the required fields (see Configuration section above).
 
 If you don't have an Elevenlabs account - we're working on a solution with htgo-tts and other providers.
@@ -125,7 +90,7 @@ If you don't have an Elevenlabs account - we're working on a solution with htgo-
 2. Try a simple example video generation:
 
 ```shell
-codevideo-cli -p "[{\"name\":\"author-speak-before\",\"value\":\"Let's learn how to use the print function in Python!\"},{\"name\":\"author-speak-before\",\"value\":\"First, let's make a Python file.\"},{\"name\":\"file-explorer-create-file\",\"value\":\"main.py\"},{\"name\":\"file-explorer-open-file\",\"value\":\"main.py\"},{\"name\":\"author-speak-before\",\"value\":\"and let's print 'Hello world!' to the console.\"},{\"name\":\"editor-type\",\"value\":\"print('Hello, world!')\"}]"
+codevideo -p "[{\"name\":\"author-speak-before\",\"value\":\"Let's learn how to use the print function in Python!\"},{\"name\":\"author-speak-before\",\"value\":\"First, let's make a Python file.\"},{\"name\":\"file-explorer-create-file\",\"value\":\"main.py\"},{\"name\":\"file-explorer-open-file\",\"value\":\"main.py\"},{\"name\":\"author-speak-before\",\"value\":\"and let's print 'Hello world!' to the console.\"},{\"name\":\"editor-type\",\"value\":\"print('Hello, world!')\"}]"
 ```
 
 Note: if you are using `zsh` and get the error `zsh: event not found: \`, try deactivate history expansion with `set +o histexpand` and try the command again.
@@ -144,39 +109,52 @@ As an alternative, paste your actions, lesson, or course JSON into `data/actions
 With actions:
 
 ```shell
-codevideo-cli -p "$(cat data/actions.json)"
+./codevideo -p "$(cat data/actions.json)"
 ```
 
 With a lesson:
 
 ```shell
-codevideo-cli -p "$(cat data/lesson.json)"
+./codevideo -p "$(cat data/lesson.json)"
 ```
 
 With a course:
 
 ```shell
-codevideo-cli -p "$(cat data/course.json)"
+./codevideo -p "$(cat data/course.json)"
 ```
 
 ## Complex CLI Example - Actions, With Given Output Path, and Open when Done
 
 ```shell
-codevideo-cli -p "$(cat data/actions.json)" -o mysuperspecialvideo.mp4 --open
+./codevideo -p "$(cat data/actions.json)" -o codevideo-intro.mp4 --open
 ```
+
+## Video Configuration Options
+
+You can specify the orientation and resolution of the video with the `-r` or `--resolution` and `-o` or `--orientation` flags, respectively. The default resolution is `1080p` and the default orientation is `landscape`.
+
+## IDE Configuration Options
+
+All React IDE props from the `CodeVideoIDE` can be passed in via the `-c` or `--config` to a config.json file. (See `data/config.json` for an example)
+
+```shell
+./codevideo -p "$(cat data/actions.json)" -c data/config.json
+```
+
 
 ## Server usage:
 
 Simply pass the `-m serve` parameter to the command to start the server:
 
 ```shell
-codevideo-cli -m serve
+codevideo -m serve
 ```
 
 To run in the background use `nohup` or similar:
 
 ```shell
-nohup codevideo-cli -m serve &
+nohup codevideo -m serve &
 ```
 
 ## Docker 

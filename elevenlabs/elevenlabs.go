@@ -10,31 +10,34 @@ import (
 	"time"
 )
 
-var customTransforms = map[string]string{
-	"C#":       "C sharp",
-	"areEqual": "are equal",
-	".NET":     "dot net",
-	"C++":      "C plus plus",
-	"_":        " underscore ",
-	".sh":      "dot S H",
-	".js":      "dot J S",
-	".ts":      "dot T S",
-	".css":     "dot C S S",
-	".html":    "dot H T M L",
-	".json":    "dot J S O N",
-	".yaml":    "dot yaml",
-	".yml":     "dot yaml",
-	".xml":     "dot X M L",
-	".md":      "dot M D",
-	".txt":     "dot T X T",
-	".log":     "dot L O G",
-	".csv":     "dot C S V",
-	".go":      "dot go",
+var customSpeechTransforms = map[string]string{
+	"C#":          "C sharp",
+	"areEqual":    "are equal",
+	".NET":        "dot net",
+	"C++":         "C plus plus",
+	"_":           " underscore ",
+	".sh":         "dot S H",
+	".js":         "dot J S",
+	".ts":         "dot T S",
+	".css":        "dot C S S",
+	".html":       "dot H T M L",
+	".json":       "dot J S O N",
+	".yaml":       "dot yaml",
+	".yml":        "dot yaml",
+	".xml":        "dot X M L",
+	".md":         "dot M D",
+	".txt":        "dot T X T",
+	".log":        "dot L O G",
+	".csv":        "dot C S V",
+	".go":         "dot go",
+	"console.log": "console dot log",
+	"codevideo":   "code video",
+	"CodeVideo":   "code video",
 }
 
 // applyCustomTransforms applies all custom text transformations.
 func applyCustomTransforms(text string) string {
-	for key, value := range customTransforms {
+	for key, value := range customSpeechTransforms {
 		if strings.Contains(text, key) {
 			text = strings.ReplaceAll(text, key, value)
 		}
@@ -54,15 +57,18 @@ func GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId string) ([
 		Text          string `json:"text"`
 		ModelID       string `json:"model_id"`
 		VoiceSettings struct {
-			Stability       float64 `json:"stability"`
-			SimilarityBoost float64 `json:"similarity_boost"`
+			Stability         float64 `json:"stability"`
+			SimilarityBoost   float64 `json:"similarity_boost"`
+			StyleExaggeration float64 `json:"style_exaggeration"`
 		} `json:"voice_settings"`
 	}{
-		Text:    textToSpeak,
-		ModelID: "eleven_turbo_v2",
+		Text: textToSpeak,
+		// ModelID: "eleven_turbo_v2",
+		ModelID: "eleven_multilingual_v2",
 	}
 	payload.VoiceSettings.Stability = 0.5
-	payload.VoiceSettings.SimilarityBoost = 0.95
+	payload.VoiceSettings.SimilarityBoost = 0.75
+	payload.VoiceSettings.StyleExaggeration = 0.5
 
 	reqBody, err := json.Marshal(payload)
 	if err != nil {

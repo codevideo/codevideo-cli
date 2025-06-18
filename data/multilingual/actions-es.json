@@ -1,0 +1,82 @@
+[
+  {
+    "name": "author-speak-before",
+    "value": "Esta lección es para mostrar qué tan rápido podemos convertir los videos de CodeVideo a diferentes idiomas. Como ejemplo, vamos a aprender sobre los bucles for en Python."
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Primero, vamos a crear y abrir un archivo llamado main.py."
+  },
+  {
+    "name": "mouse-move-file-explorer",
+    "value": "1"
+  },
+  {
+    "name": "mouse-right-click",
+    "value": "1"
+  },
+  {
+    "name": "mouse-move-file-explorer-context-menu-new-file",
+    "value": "1"
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "file-explorer-type-new-file-input",
+    "value": "main.py"
+  },
+  {
+    "name": "file-explorer-enter-new-file-input",
+    "value": "1"
+  },
+  {
+    "name": "editor-type",
+    "value": "# Vamos a imprimir \"¡Hola, Mundo!\" cinco veces usando un bucle for\n"
+  },
+  {
+    "name": "editor-type",
+    "value": "for i in range(5):"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Usamos el patrón 'for i in range'. En este caso, como queremos repetirlo 5 veces, usamos range con 5."
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Ahora vamos a imprimir 'Hola, Mundo' usando la función print."
+  },
+  {
+    "name": "editor-type",
+    "value": "\n    print(\"¡Hola, Mundo!\")"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Abramos ahora una terminal y ejecutemos este script."
+  },
+  {
+    "name": "terminal-open",
+    "value": "1"
+  },
+  {
+    "name": "terminal-type",
+    "value": "python main.py"
+  },
+  {
+    "name": "terminal-enter",
+    "value": "1"
+  },
+  {
+    "name": "terminal-set-output",
+    "value": "¡Hola, Mundo!\n¡Hola, Mundo!\n¡Hola, Mundo!\n¡Hola, Mundo!\n¡Hola, Mundo!"
+  },
+  {
+    "name": "terminal-enter",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "¡Perfecto! Así es como se escriben los bucles for en Python."
+  }
+]
