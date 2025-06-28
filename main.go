@@ -127,6 +127,9 @@ func init() {
 
 	// --config or -c flag for specifying config JSON file path
 	rootCmd.Flags().StringP("config", "c", "", "Path to config JSON file")
+
+	// --debug or -d flag for enabling debug mode (non-headless browser)
+	rootCmd.Flags().BoolP("debug", "d", false, "Enable debug mode (run browser in non-headless mode)")
 }
 
 func main() {

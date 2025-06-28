@@ -28,6 +28,11 @@ const argv = yargs(hideBin(process.argv))
     default: 'landscape',
     description: 'Video orientation (landscape or portrait)'
   })
+  .option('debug', {
+    type: 'boolean',
+    default: false,
+    description: 'Run in non-headless mode for debugging'
+  })
   .argv;
 
 // parse uuid, resolution and orientation from command line arguments
@@ -35,6 +40,7 @@ const uuid = argv.uuid;
 const os = argv.os;
 const resolution = argv.resolution;
 const orientation = argv.orientation;
+const debug = argv.debug;
 
 // set width and height based on resolution and orientation
 let width, height;
@@ -53,6 +59,7 @@ if (!uuid) {
 
 async function recordVideoV3() {
     console.log("Starting recording for UUID: ", uuid);
+    console.log("Debug mode:", debug ? "ENABLED - Browser will be visible" : "disabled");
 
     const outputWebm = path.join(__dirname, `../../tmp/v3/video/${uuid}.webm`);
     const file = fs.createWriteStream(outputWebm);
@@ -65,8 +72,7 @@ async function recordVideoV3() {
         // executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         // linux (docker):
         executablePath: os === "mac" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "/usr/bin/chromium-browser",
-        headless: "new", // supports audio!
-        // headless: false, // for debugging
+        headless: debug ? false : "new", // Use non-headless mode when debugging
         defaultViewport: { width, height },
         args: [
             `--window-size=${width},${height}`,
@@ -95,6 +101,16 @@ async function recordVideoV3() {
     // Log all browser console messages.
     page.on('console', msg => {
         console.log('BROWSER LOG:', msg.text());
+    });
+
+    // Log page errors
+    page.on('pageerror', error => {
+        console.log('PAGE ERROR:', error.message);
+    });
+
+    // Log network failures
+    page.on('requestfailed', req => {
+        console.log('REQUEST FAILED:', req.url(), req.failure().errorText);
     });
 
     // Create a promise that resolves when the final progress update is received.
@@ -169,6 +185,13 @@ async function recordVideoV3() {
 
     // Once complete, tear down the recording.
     console.log("Final progress received. Stopping recording...");
+    
+    // If debug mode is enabled, wait longer to allow inspection
+    if (debug) {
+        console.log("Debug mode: Waiting 5 seconds before closing browser...");
+        await sleep(5000);
+    }
+    
     await stream.destroy();
     file.close();
     console.log("Recording finished");

@@ -75,31 +75,51 @@
   "actions": [
     {
       "name": "author-speak-before",
-      "value": "Welcome to this walkthrough of a simple two file repository."
+      "value": "Hi everyone, Chris here with another CodeVideo update."
     },
     {
       "name": "author-speak-before",
-      "value": "Let's start by opening package.json."
+      "value": "You'll notice already two things different than previous codevideos. Most notably, we're able to start of with any number of files or folders in the file explorer."
     },
     {
-      "name": "file-explorer-open-file",
+      "name": "author-speak-before",
+      "value": "This opens up a world of new possibilities, like making lessons about existing codebases, or continuing a lesson from a point of a previous lesson."
+    },
+    {
+      "name": "author-speak-before",
+      "value": "You'll also notice at the bottom left we now have this dev box, which displays various variables used in the CodeVideo component. It can be very helpful for debugging why your codevideo might not be looking just as expected."
+    },
+    {
+      "name": "author-speak-before",
+      "value": "Alright - let's get into these files and start by opening package JSON."
+    },
+    {
+      "name": "mouse-move-file-explorer-file",
       "value": "package.json"
     },
     {
+      "name": "mouse-left-click",
+      "value": "1"
+    },
+    {
       "name": "author-speak-before",
-      "value": "The package.json is just a dummy package json for testing."
+      "value": "The package JSON is just a dummy package JSON for testing."
     },
     {
       "name": "author-speak-before",
       "value": "Now, let's open up index.js."
     },
     {
-      "name": "file-explorer-open-file",
+      "name": "mouse-move-file-explorer-file",
       "value": "index.js"
     },
     {
+      "name": "mouse-left-click",
+      "value": "1"
+    },
+    {
       "name": "author-speak-before",
-      "value": "This is the main entry point."
+      "value": "This would be the main entry point, but for now it's also just a dummy JavaScript file."
     },
     {
       "name": "author-speak-before",
@@ -124,6 +144,10 @@
     {
       "name": "author-speak-before",
       "value": "Perfect - right back where we started! Until next time, happy coding!"
+    },
+    {
+      "name": "mouse-move-editor",
+      "value": "1"
     }
   ]
 }

@@ -355,6 +355,11 @@ func RunPuppeteerForUUID(uuid string, mode string) bool {
 		"--resolution", resolution,
 		"--orientation", orientation)
 
+	// Add debug flag if enabled
+	if config.GlobalConfig.Debug {
+		cmd.Args = append(cmd.Args, "--debug")
+	}
+
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Printf("Error obtaining stdout pipe: %v", err)

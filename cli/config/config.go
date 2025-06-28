@@ -25,6 +25,7 @@ type Config struct {
 	// Processing settings
 	Resolution  string
 	Orientation string
+	Debug       bool // Debug mode flag
 
 	// Environment
 	OperatingSystem string
@@ -50,6 +51,7 @@ func DefaultConfig() *Config {
 		OutputFormat:    "mp4",
 		Resolution:      "1080p",     // 1080p by default, could be 4K
 		Orientation:     "landscape", // Default to landscape
+		Debug:           false,       // Debug mode disabled by default
 		OperatingSystem: runtime.GOOS,
 		Environment:     "local",
 	}
@@ -83,6 +85,10 @@ func LoadFromFlags(cmd *cobra.Command) error {
 	if configPath != "" {
 		GlobalConfig.ConfigFilePath = configPath
 	}
+
+	// Read debug flag if provided
+	debug, _ := cmd.Flags().GetBool("debug")
+	GlobalConfig.Debug = debug
 
 	// Ensure output directories exist
 	return GlobalConfig.EnsureOutputDirs()

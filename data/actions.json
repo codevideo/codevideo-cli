@@ -1,15 +1,11 @@
 [
   {
     "name": "author-speak-before",
-    "value": "Welcome to this lesson where we'll build a simple web app while testing some exciting new CodeVideo features! We'll create an HTML file, a JavaScript file, and a CSS file, then use the external web preview to see our app in action."
-  },
-  {
-    "name": "slide-display",
-    "value": "# CodeVideo New Features!\n\n- Web Preview\n- Editor Scrolling\n- Color Changes with Preview Updates"
+    "value": "Welcome to our first lesson on Model Context Protocol! In this short tutorial, we'll build the tiniest possible MCP server using FastMCP in Python, and test it with mcp-cli. By the end of this lesson, you'll see a complete round-trip from MCP server creation to JSON response."
   },
   {
     "name": "author-speak-before",
-    "value": "Let's start by creating our HTML file. We'll right-click in the file explorer to create a new file."
+    "value": "First, we need to create our hello_mcp.py file. This will contain our minimal MCP server implementation."
   },
   {
     "name": "mouse-move-file-explorer",
@@ -29,7 +25,7 @@
   },
   {
     "name": "file-explorer-type-new-file-input",
-    "value": "index.html"
+    "value": "hello_mcp.py"
   },
   {
     "name": "file-explorer-enter-new-file-input",
@@ -37,150 +33,14 @@
   },
   {
     "name": "author-speak-before",
-    "value": "Great. Now let's add some basic HTML structure to our file."
+    "value": "Now let's write our MCP server code. We'll start by importing the FastMCP library."
   },
   {
     "name": "editor-type",
-    "value": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Feature Test App</title>\n    <link rel=\"stylesheet\" href=\"styles.css\">\n</head>\n<body>\n    <div class=\"container\">\n        <h1 id=\"title\">/> CodeVideo Web Preview Example!</h1>\n    </div>\n    <script src=\"index.js\"></script>\n</body>\n</html>"
+    "value": "from fastmcp import FastMCP"
   },
   {
-    "name": "editor-save",
-    "value": "1"
-  },
-  {
-    "name": "author-speak-before",
-    "value": "Now let's create our JavaScript file to add some interactivity."
-  },
-  {
-    "name": "mouse-move-file-explorer",
-    "value": "1"
-  },
-  {
-    "name": "mouse-right-click",
-    "value": "1"
-  },
-  {
-    "name": "mouse-move-file-explorer-context-menu-new-file",
-    "value": "1"
-  },
-  {
-    "name": "mouse-left-click",
-    "value": "1"
-  },
-  {
-    "name": "file-explorer-type-new-file-input",
-    "value": "index.js"
-  },
-  {
-    "name": "file-explorer-enter-new-file-input",
-    "value": "1"
-  },
-  {
-    "name": "editor-type",
-    "value": "document.addEventListener('DOMContentLoaded', function() {\n    const title = document.getElementById('title');\n    let isBlue = true;\n\n    // toggle title color from blue to green every second\n    setInterval(() => {\n        title.style.color = isBlue ? 'green' : 'blue';\n        isBlue = !isBlue;\n    }, 1000);\n});"
-  },
-  {
-    "name": "editor-save",
-    "value": "1"
-  },
-  {
-    "name": "author-speak-before",
-    "value": "Now let's create our CSS file."
-  },
-  {
-    "name": "mouse-move-file-explorer",
-    "value": "1"
-  },
-  {
-    "name": "mouse-right-click",
-    "value": "1"
-  },
-  {
-    "name": "mouse-move-file-explorer-context-menu-new-file",
-    "value": "1"
-  },
-  {
-    "name": "mouse-left-click",
-    "value": "1"
-  },
-  {
-    "name": "file-explorer-type-new-file-input",
-    "value": "styles.css"
-  },
-  {
-    "name": "file-explorer-enter-new-file-input",
-    "value": "1"
-  },
-  {
-    "name": "editor-type",
-    "value": "/* Reset and base styles */\n* {\n    margin: 0;\n    padding: 0;\n    box-sizing: border-box;\n}\n\nbody {\n    font-family: Arial, sans-serif;\n    line-height: 1.6;\n    color: #333;\n    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n    min-height: 100vh;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n/* Container styles */\n.container {\n    background: white;\n    padding: 2rem;\n    border-radius: 10px;\n    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);\n    text-align: center;\n    max-width: 400px;\n    width: 90%;\n}\n\n/* Title styles */\n#title {\n    font-size: 2.5rem;\n    margin-bottom: 1.5rem;\n    color: #2c3e50;\n    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);\n    transition: color 0.3s ease;\n}\n\n#title:hover {\n    transform: scale(1.05);\n    transition: transform 0.3s ease;\n}\n\n/* Button styles */\n#colorBtn {\n    background: linear-gradient(45deg, #ff6b6b, #ee5a24);\n    color: white;\n    border: none;\n    padding: 12px 24px;\n    font-size: 1.1rem;\n    border-radius: 25px;\n    cursor: pointer;\n    transition: all 0.3s ease;\n    box-shadow: 0 4px 15px rgba(238, 90, 36, 0.3);\n}\n\n#colorBtn:hover {\n    transform: translateY(-2px);\n    box-shadow: 0 6px 20px rgba(238, 90, 36, 0.4);\n}\n\n#colorBtn:active {\n    transform: translateY(0);\n}\n\n/* Responsive design */\n@media (max-width: 600px) {\n    .container {\n        padding: 1.5rem;\n    }\n\n    #title {\n        font-size: 2rem;\n    }\n\n    #colorBtn {\n        padding: 10px 20px;\n        font-size: 1rem;\n    }\n}\n\n/* Additional animations */\n@keyframes fadeIn {\n    from {\n        opacity: 0;\n        transform: translateY(20px);\n    }\n    to {\n        opacity: 1;\n        transform: translateY(0);\n    }\n}\n\n.container {\n    animation: fadeIn 0.6s ease-out;\n}\n\n/* Extra utility classes */\n.text-center {\n    text-align: center;\n}\n\n.margin-top {\n    margin-top: 1rem;\n}\n\n.margin-bottom {\n    margin-bottom: 1rem;\n}\n\n.padding-small {\n    padding: 0.5rem;\n}\n\n.padding-medium {\n    padding: 1rem;\n}\n\n.padding-large {\n    padding: 2rem;\n}"
-  },
-  {
-    "name": "editor-save",
-    "value": "1"
-  },
-  {
-    "name": "author-speak-before",
-    "value": "Perfect. Now let's test the web preview feature to see our app in action."
-  },
-  {
-    "name": "external-web-preview",
-    "value": "1"
-  },
-  {
-    "name": "author-speak-before",
-    "value": "Great. Our app is working. Now let's make a quick color change to test the web preview refresh."
-  },
-  {
-    "name": "file-explorer-open-file",
-    "value": "styles.css"
-  },
-  {
-    "name": "editor-arrow-up",
-    "value": "100"
-  },
-  {
-    "name": "editor-arrow-up",
-    "value": "8"
-  },
-  {
-    "name": "editor-arrow-left",
+    "name": "editor-enter",
     "value": "2"
-  },
-  {
-    "name": "author-speak-before",
-    "value": "We'll change the background color from that blue purple gradient to a bright green one."
-  },
-  {
-    "name": "editor-backspace",
-    "value": "61"
-  },
-  {
-    "name": "editor-type",
-    "value": "background: linear-gradient(135deg, #35c230 0%, #4ba27b 100%)"
-  },
-  {
-    "name": "editor-save",
-    "value": "1"
-  },
-  {
-    "name": "author-speak-before",
-    "value": "Let's see our updated app with the new green background color!"
-  },
-  {
-    "name": "external-web-preview",
-    "value": "index.html"
-  },
-  {
-    "name": "author-speak-before",
-    "value": "Excellent. The web preview has updated with our new green background."
-  },
-  {
-    "name": "author-speak-before",
-    "value": "Perfect. We've successfully tested all the new CodeVideo features: web preview of our local development files, editor scrolling to navigate through our CSS file, and color changes with preview updates. Our simple web app demonstrates how these features work together to create a smooth educational experience."
-  },
-  {
-    "name": "author-speak-before",
-    "value": "That's all for now. I hope you enjoyed this lesson and find the new features useful. As always, the CodeVideo Studio is free and open to everyone at studio dot codevideo dot com."
   }
 ]

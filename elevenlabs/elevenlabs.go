@@ -21,7 +21,6 @@ var customSpeechTransforms = map[string]string{
 	".ts":         "dot T S",
 	".css":        "dot C S S",
 	".html":       "dot H T M L",
-	".json":       "dot J S O N",
 	".yaml":       "dot yaml",
 	".yml":        "dot yaml",
 	".xml":        "dot X M L",
@@ -30,9 +29,17 @@ var customSpeechTransforms = map[string]string{
 	".log":        "dot L O G",
 	".csv":        "dot C S V",
 	".go":         "dot go",
+	".py":         "dot pi",
 	"console.log": "console dot log",
 	"codevideo":   "code video",
 	"CodeVideo":   "code video",
+	".json":       "dot jason",
+	"JSON":        "jason",
+	"json":        "jason",
+	"mcp-cli":     "M C P C L I",
+	"stdin":       "standard in",
+	"stdout":      "standard out",
+	"stderr":      "standard error",
 }
 
 // applyCustomTransforms applies all custom text transformations.
@@ -51,6 +58,12 @@ func GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId string) ([
 	// Apply any custom transforms
 	textToSpeak = applyCustomTransforms(textToSpeak)
 
+	// model ID - if it is my voice (1RLeGxy9FHYB5ScpFkts) use "eleven_turbo_v2"
+	modelId := "eleven_multilingual_v2"
+	if ttsVoiceId == "1RLeGxy9FHYB5ScpFkts" {
+		modelId = "eleven_turbo_v2"
+	}
+
 	// Prepare the request payload.
 	// It must match the API’s expected JSON structure.
 	payload := struct {
@@ -64,7 +77,7 @@ func GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId string) ([
 	}{
 		Text: textToSpeak,
 		// ModelID: "eleven_turbo_v2",
-		ModelID: "eleven_multilingual_v2",
+		ModelID: modelId,
 	}
 	payload.VoiceSettings.Stability = 0.5
 	payload.VoiceSettings.SimilarityBoost = 0.75
