@@ -36,7 +36,6 @@ func Start(ctx context.Context) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server: %w", err)
 	}
-	log.Printf("Starting server on port %d", srv.Port)
 
 	// Start the embedded HTTP server.
 	if err := srv.StartServer(ctx); err != nil {
@@ -49,7 +48,6 @@ func Start(ctx context.Context) (*Server, error) {
 		srv.Stop()
 		return nil, fmt.Errorf("server startup error: %w", err)
 	}
-	log.Printf("Server is ready at %s", srv.GetURL())
 
 	return srv, nil
 }

@@ -4,53 +4,24 @@ The CLI tool for generating CodeVideos.
 
 ## Installation
 
-### Option 1: Homebrew (Recommended for macOS)
-
-```bash
-brew tap codevideo/codevideo
-brew install codevideo
-```
-
-After installation, use the tool as `codevideo`:
-
-```bash
-codevideo --help
-```
-
-### Option 2: Download Pre-built Binaries
-
-1. Go to the [Releases page](https://github.com/codevideo/codevideo/releases) and download the appropriate binary for your OS:
-
-2. Make the binary executable (Linux/macOS only):
-
-```bash
-chmod +x codevideo-*
-```
-
-3. Optionally, rename and move to your PATH:
-
-```bash
-# Linux/macOS - rename and move to system bin
-sudo mv codevideo-* /usr/local/bin/codevideo
-
-# Or add to your user bin
-mkdir -p ~/bin
-mv codevideo-* ~/bin/codevideo
-```
-
-### Option 3: Build from Source
-
-If you prefer to build from source or need the latest development version:
-
 ```shell
 git clone https://github.com/codevideo/codevideo
 cd codevideo
+cd puppeteer-runner
+npm install
+npx @puppeteer/browsers install chrome@latest
+```
+
+Make a note of what was installed in `puppeteer-runner/chrome` - you'll need to update the path in `puppeteer-runner/recordVideoV3.js` on line 73.
+
+Then build the Go binary:
+
+```shell
+cd ../..
 go build -o codevideo
 ```
 
-## Configuration
-
-Create a `.env` file in your **working directory** (the directory where you plan to run codevideo):
+Very importantly, create a `.env` file with your Elevenlabs API key:
 
 ```env
 # Copy from .env.example and fill in your values
@@ -58,42 +29,19 @@ ELEVENLABS_API_KEY=your-elevenlabs-api-key
 # ... other configuration options
 ```
 
-**Important:** The `.env` file is loaded from your current working directory when you run the command, not from where the binary is installed.
-
-### Configuration Options:
-
-1. **Project-specific .env file** (recommended):
-   ```bash
-   cd /path/to/your/project
-   echo "ELEVENLABS_API_KEY=your-key" > .env
-   codevideo -p "your-actions"
-   ```
-
-2. **Global environment variables:**
-   ```bash
-   export ELEVENLABS_API_KEY=your-key
-   codevideo -p "your-actions"
-   ```
-
-3. **Home directory .env file:**
-   ```bash
-   echo "ELEVENLABS_API_KEY=your-key" > ~/.env
-   cd ~ && codevideo -p "your-actions"
-   ```
-
-## Usage
-
-1. Create your `.env` file with the required fields (see Configuration section above).
+You should be ready to start using the CodeVideo CLI!
 
 If you don't have an Elevenlabs account - we're working on a solution with htgo-tts and other providers.
 
-2. Try a simple example video generation:
+## Usage
+
+With actions:
 
 ```shell
-codevideo -p "[{\"name\":\"author-speak-before\",\"value\":\"Let's learn how to use the print function in Python!\"},{\"name\":\"author-speak-before\",\"value\":\"First, let's make a Python file.\"},{\"name\":\"file-explorer-create-file\",\"value\":\"main.py\"},{\"name\":\"file-explorer-open-file\",\"value\":\"main.py\"},{\"name\":\"author-speak-before\",\"value\":\"and let's print 'Hello world!' to the console.\"},{\"name\":\"editor-type\",\"value\":\"print('Hello, world!')\"}]"
+./codevideo -p "$(cat data/actions.json)"
 ```
 
-Note: if you are using `zsh` and get the error `zsh: event not found: \`, try deactivate history expansion with `set +o histexpand` and try the command again.
+Note: if you are using `zsh` and get the error `zsh: event not found: \`, try deactivating history expansion with `set +o histexpand` and try the command again.
 
 If all works well, you should see the following final output:
 
@@ -142,20 +90,21 @@ All React IDE props from the `CodeVideoIDE` can be passed in via the `-c` or `--
 ./codevideo -p "$(cat data/actions.json)" -c data/config.json
 ```
 
-
 ## Server usage:
 
 Simply pass the `-m serve` parameter to the command to start the server:
 
 ```shell
-codevideo -m serve
+./codevideo -m serve
 ```
 
 To run in the background use `nohup` or similar:
 
 ```shell
-nohup codevideo -m serve &
+nohup ./codevideo -m serve &
 ```
+
+This will watch for manifest files in /tmp/v3/new and process them as they arrive. The server will output the video to the `output` folder.
 
 ## Docker 
 
@@ -181,7 +130,7 @@ docker run -v $(pwd)/.env:/.env -v $(pwd)/output:/app/output codevideo -p "[{\"n
 
 You can update the Gatsby static site by replacing the `public` folder within `cli/staticserver`. We recommend you use the `example` site within the `example` folder of the [`@fullstackcraftllc/codevideo-ide-react`](https://github.com/codevideo/codevideo-ide-react) repository.
 
-Everything in the `public` folder is treated as an embedded go resource and served by the server.
+Everything in the `public` folder is treated as an embedded Go resource and served by the server.
 
 ## CodeVideo Studio
 

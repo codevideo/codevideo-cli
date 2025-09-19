@@ -68,21 +68,22 @@ async function recordVideoV3() {
 
     const browser = await launch({
         dumpio: true,
-        // macOS:
-        // executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        // linux (docker):
-        executablePath: os === "mac" ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : "/usr/bin/chromium-browser",
+        startDelay: 1000,
+        // UPDATE YOUR PATH TO THE NAME OF WHAT IS INSTALLED VIA 'npx @puppeteer/browsers install chrome@latest'
+        executablePath: path.join(__dirname, "chrome/mac_arm-142.0.7415.0/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"), //: "/usr/bin/chromium-browser",
         headless: debug ? false : "new", // Use non-headless mode when debugging
         defaultViewport: { width, height },
         args: [
             `--window-size=${width},${height}`,
             '--start-fullscreen',
-            `--ozone-override-screen-size=${width},${height}`, // for linux
-            '--no-sandbox', // to run as root on docker
+            // `--ozone-override-screen-size=${width},${height}`, // for linux
+            // '--no-sandbox', // to run as root on docker
             '--autoplay-policy=no-user-gesture-required',
+            '--enable-extensions',
             // '--disable-web-security',
             // '--enable-logging=stderr',  // Enable detailed logging
             '--v=1',                    // Increase verbosity level
+            '--allowlisted-extension-id=jjndjgheafjngoipoacpjgeicjeomjli', // allowlist the puppeteer-stream extension
         ],
     });
 

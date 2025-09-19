@@ -15,3 +15,6 @@ nohup.out
 
 # log files
 *.log
+
+# chrome versions in puppeteer-runner
+puppeteer-runner/chrome
