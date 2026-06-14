@@ -102,7 +102,7 @@ func WatchForManifestFiles() {
 			if !ok {
 				return
 			}
-			log.Printf("Watcher error:", err)
+			log.Printf("Watcher error: %v", err)
 		}
 	}
 }
