@@ -1,15 +1,16 @@
 package types
 
 type CodeVideoManifest struct {
-	Environment       string             `json:"environment"`
-	UserID            string             `json:"userId"`
-	UUID              string             `json:"uuid"`
-	Actions           []Action           `json:"actions,omitempty"`
-	Lesson            Lesson             `json:"lesson,omitempty"`
-	AudioItems        []AudioItem        `json:"audioItems"`
-	FontSizePx        int                `json:"fontSizePx,omitempty"`
-	Error             string             `json:"error,omitempty"`
-	CodeVideoIDEProps *CodeVideoIDEProps `json:"codeVideoIDEProps,omitempty"`
+	Environment        string             `json:"environment"`
+	UserID             string             `json:"userId"`
+	UUID               string             `json:"uuid"`
+	Actions            []Action           `json:"actions,omitempty"`
+	Lesson             Lesson             `json:"lesson,omitempty"`
+	CurrentLessonIndex int                `json:"currentLessonIndex,omitempty"`
+	AudioItems         []AudioItem        `json:"audioItems"`
+	FontSizePx         int                `json:"fontSizePx,omitempty"`
+	Error              string             `json:"error,omitempty"`
+	CodeVideoIDEProps  *CodeVideoIDEProps `json:"codeVideoIDEProps,omitempty"`
 }
 
 // Configuration holds all CLI configuration
@@ -57,11 +58,15 @@ func (a ActionsProject) GetType() string {
 // we use a generic map to avoid having to define every field
 type CourseSnapshot map[string]interface{}
 
-// Lesson represents a lesson project
+// Lesson represents a lesson project.
+// Field names/tags mirror the TS ILesson (codevideo-types): it serializes
+// "name" (not "title") plus "id" and optional "finalSnapshot".
 type Lesson struct {
-	Title           string         `json:"title"`
+	ID              string         `json:"id"`
+	Name            string         `json:"name"`
 	Description     string         `json:"description"`
 	InitialSnapshot CourseSnapshot `json:"initialSnapshot"`
+	FinalSnapshot   CourseSnapshot `json:"finalSnapshot,omitempty"`
 	Actions         []Action       `json:"actions"`
 }
 
@@ -70,11 +75,15 @@ func (l Lesson) GetType() string {
 	return "Lesson"
 }
 
-// Course represents a course project
+// Course represents a course project.
+// Field names/tags mirror the TS ICourse: "name" (not "title"), plus "id"
+// and "primaryLanguage".
 type Course struct {
-	Title       string   `json:"title"`
-	Description string   `json:"description"`
-	Lessons     []Lesson `json:"lessons"`
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	PrimaryLanguage string   `json:"primaryLanguage"`
+	Lessons         []Lesson `json:"lessons"`
 }
 
 // GetType implements the Project interface
