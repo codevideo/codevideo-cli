@@ -7,6 +7,50 @@ const { hideBin } = require('yargs/helpers');
 // define sleep helper function
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 
+// Resolve the Chrome for Testing executable instead of hardcoding a version
+// path (which breaks on every Chrome update). Order of resolution:
+//   1. CODEVIDEO_CHROME_PATH env var (explicit override)
+//   2. the newest chrome/<platform>-<version>/ install under puppeteer-runner,
+//      across mac/linux/win binary layouts
+// Install one with: npx @puppeteer/browsers install chrome@latest
+function resolveChromeExecutable() {
+    const envPath = process.env.CODEVIDEO_CHROME_PATH;
+    if (envPath) {
+        if (!fs.existsSync(envPath)) {
+            throw new Error(`CODEVIDEO_CHROME_PATH is set to "${envPath}" but no file exists there.`);
+        }
+        return envPath;
+    }
+    const chromeRoot = path.join(__dirname, "chrome");
+    const candidateSubpaths = [
+        "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        "chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+        "chrome-linux64/chrome",
+        "chrome-win64/chrome.exe",
+    ];
+    if (fs.existsSync(chromeRoot)) {
+        const versionDirs = fs.readdirSync(chromeRoot)
+            .map(d => path.join(chromeRoot, d))
+            .filter(d => fs.statSync(d).isDirectory())
+            .sort()
+            .reverse(); // newest version tends to sort last, so check it first
+        for (const dir of versionDirs) {
+            for (const sub of candidateSubpaths) {
+                const candidate = path.join(dir, sub);
+                if (fs.existsSync(candidate)) {
+                    return candidate;
+                }
+            }
+        }
+    }
+    throw new Error(
+        "No Chrome for Testing binary found under puppeteer-runner/chrome/ and " +
+        "CODEVIDEO_CHROME_PATH is not set.\n" +
+        "Install one with:  npx @puppeteer/browsers install chrome@latest\n" +
+        "or set CODEVIDEO_CHROME_PATH to an existing Chrome/Chromium binary."
+    );
+}
+
 // Parse command line arguments
 const argv = yargs(hideBin(process.argv))
   .option('uuid', {
@@ -69,8 +113,7 @@ async function recordVideoV3() {
     const browser = await launch({
         dumpio: true,
         startDelay: 1000,
-        // UPDATE YOUR PATH TO THE NAME OF WHAT IS INSTALLED VIA 'npx @puppeteer/browsers install chrome@latest'
-        executablePath: path.join(__dirname, "chrome/mac_arm-142.0.7415.0/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"), //: "/usr/bin/chromium-browser",
+        executablePath: resolveChromeExecutable(),
         headless: debug ? false : "new", // Use non-headless mode when debugging
         defaultViewport: { width, height },
         args: [

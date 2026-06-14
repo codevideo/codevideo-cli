@@ -53,8 +53,10 @@ func WatchForManifestFiles() {
 		log.Fatal(err)
 	}
 
-	// semaphore channel to limit concurrency to maxConcurrentJobs jobs.
-	semaphore := make(chan struct{}, constants.MAX_CONCURRENT_JOBS)
+	// semaphore channel to limit concurrency (overridable via CODEVIDEO_MAX_CONCURRENT_JOBS).
+	maxConcurrentJobs := constants.MaxConcurrentJobs()
+	log.Printf("Worker concurrency limit: %d", maxConcurrentJobs)
+	semaphore := make(chan struct{}, maxConcurrentJobs)
 
 	// get absolute path of 'new' folder
 	absPath, err := filepath.Abs(constants.NEW_FOLDER)
