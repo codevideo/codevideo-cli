@@ -1,0 +1,19 @@
+[
+    {
+        "name": "author-speak-before",
+        "value": "Today we're going to learn about the CycloneDX CLI tool."
+    },
+    {
+        "name": "slide-display",
+        "value": "1. Add the following to your `.config/dotnet-tools.json`:\n\n```json\n\"CycloneDX\": {\n      \"version\": \"5.4.0\",\n      \"commands\": [\n        \"dotnet-CycloneDX\"\n      ],\n      \"rollForward\": false\n    }\n```"
+    },
+    {
+        "name": "slide-display",
+        "value": "2. Restore it and call it in your `.gitlab-ci.yml` for example:\n\n```yml\n# Restore the CycloneDX tool\n- dotnet tool restore\n\n# Generate SBOM using CycloneDX JSON\n- dotnet CycloneDX -F Json \"${CI_PROJECT_DIR}/src/$projectName.sln\" -o sbom -fn \"${CI_PROJECT_DIR}/doc/cyclonedx/$projectName.json\"\n```"
+    },
+    {
+        "name": "slide-display",
+        "value": "Because CycloneDX does not have the `author` field, it will fail in a tool like "
+    }
+    
+]

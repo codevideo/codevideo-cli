@@ -1,22 +1,58 @@
 [
   {
     "name": "author-speak-before",
-    "value": "Welcome to our first lesson on Model Context Protocol! In this short tutorial, we'll build the tiniest possible MCP server using FastMCP in Python, and test it with mcp-cli. By the end of this lesson, you'll see a complete round-trip from MCP server creation to JSON response."
+    "value": "Hi Kittichon, thanks for your bug report and interest in CodeVideo! This is currently a speaking step, but now I'll show you similar steps as to what I think you wanted."
   },
   {
     "name": "author-speak-before",
-    "value": "First, we need to create our hello_mcp.py file. This will contain our minimal MCP server implementation."
+    "value": "In the new CodeVideo architecture, you'll have to move to the file explorer..."
   },
   {
     "name": "mouse-move-file-explorer",
     "value": "1"
   },
   {
+    "name": "author-speak-before",
+    "value": "Right click there..."
+  },
+  {
     "name": "mouse-right-click",
     "value": "1"
   },
   {
+    "name": "author-speak-before",
+    "value": "And select the 'New File' option..."
+  },
+  {
     "name": "mouse-move-file-explorer-context-menu-new-file",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Left click it..."
+  },
+  {
+    "name": "mouse-left-click",
+    "value": "1"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "And type the file name into the input..."
+  },
+  {
+    "name": "file-explorer-type-new-file-input",
+    "value": "something.dart"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "The rest of the actions are basically what you had originally. I hope this helps!"
+  },
+  {
+    "name": "file-explorer-enter-new-file-input",
+    "value": "1"
+  },
+  {
+    "name": "mouse-move-editor",
     "value": "1"
   },
   {
@@ -24,23 +60,11 @@
     "value": "1"
   },
   {
-    "name": "file-explorer-type-new-file-input",
-    "value": "hello_mcp.py"
-  },
-  {
-    "name": "file-explorer-enter-new-file-input",
-    "value": "1"
+    "name": "editor-type",
+    "value": "import 'package:flutter/material.dart';\nimport 'dart:async';\nclass Product {\n  final String id;\n  final String name;\n  final String description;\n  final double price;\n\n  Product({\n    required this.id,\n    required this.name,\n    required this.description,\n    required this.price,\n  });\n}"
   },
   {
     "name": "author-speak-before",
-    "value": "Now let's write our MCP server code. We'll start by importing the FastMCP library."
-  },
-  {
-    "name": "editor-type",
-    "value": "from fastmcp import FastMCP"
-  },
-  {
-    "name": "editor-enter",
-    "value": "2"
+    "value": "And there you have it! Dart is at least working with the latest CodeVideo CLI - I have to get the web version and API up to speed with all these new actions. Thanks again for your help!"
   }
 ]

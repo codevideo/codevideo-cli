@@ -151,11 +151,17 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 	var audioManifest []types.AudioItem
 
 	ttsApiKey := os.Getenv("ELEVEN_LABS_API_KEY")
-	ttsVoiceId := os.Getenv("ELEVEN_LABS_VOICE_ID")
+	ttsVoiceId := resolveTTSVoiceID()
+	if ttsVoiceId == "" {
+		log.Printf("No explicit ElevenLabs voice ID found in env; ElevenLabs client default voice will be used")
+	} else {
+		log.Printf("Using ElevenLabs voice ID from environment")
+	}
 
 	for i, action := range actions {
 		textToSpeak := action.Value
-		textHash := utils.Sha256Hash(textToSpeak)
+		// Include voice ID in the hash so changing voices always generates new audio objects.
+		textHash := utils.Sha256Hash(fmt.Sprintf("%s::%s", ttsVoiceId, textToSpeak))
 		if strings.HasPrefix(action.Name, "author-speak") {
 			log.Printf("Converting text at step index %d to audio... (hash is %s)\n", i, textHash)
 			audioData, err := elevenlabs.GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId)
@@ -181,4 +187,19 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 	renderer.RenderProgressToConsole(10, "Done with audio generation")
 
 	return audioManifest, nil
+}
+
+func resolveTTSVoiceID() string {
+	voiceID := strings.TrimSpace(os.Getenv("ELEVEN_LABS_VOICE_ID"))
+	if voiceID != "" {
+		return voiceID
+	}
+
+	// If the primary variable is empty, prefer the explicitly named Chris voice when available.
+	chrisVoiceID := strings.TrimSpace(os.Getenv("ELEVEN_LABS_VOICE_ID_CHRIS"))
+	if chrisVoiceID != "" {
+		return chrisVoiceID
+	}
+
+	return ""
 }

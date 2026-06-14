@@ -1,0 +1,50 @@
+[
+  {
+    "name": "author-speak-before",
+    "value": "Hi, this is Chris from Verimu. I'll show you how easy it is to get started in about five minutes."
+  },
+  {
+    "name": "slide-display",
+    "value": "# Getting started with Verimu\n\nFrom zero to CRA-compliant in 5 minutes."
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Step one is installing the CLI. You can run Verimu instantly with n p x, no install required, or install it globally if you prefer."
+  },
+  {
+    "name": "slide-display",
+    "value": "## Step 1: Install the CLI\n\n```bash\nnpx verimu\nnpm install -g verimu\n```"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Step two is your first scan. Go to any project with a lockfile and run Verimu. It auto-detects your ecosystem, generates a Cyclone D X S B O M, and checks known C V E s."
+  },
+  {
+    "name": "slide-display",
+    "value": "## Step 2: Run your first scan\n\n```bash\ncd your-project\nnpx verimu\n# Writes ./sbom.cdx.json by default\n```"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Steps three and four are account and API key setup. Create your account on app dot verimu dot com, copy your one-time key, then rerun the scan with the VERIMU_API_KEY environment variable to sync results."
+  },
+  {
+    "name": "slide-display",
+    "value": "## Steps 3-4: Account and API key\n\n```bash\n# Register\nhttps://app.verimu.com/register\n\n# Connect key and rescan\nexport VERIMU_API_KEY=vmu_your_key_here\nnpx verimu\n```"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Step five is C I and C D. Add one GitHub Actions step, set VERIMU_API_KEY as a secret, and optionally gate builds with fail-on high."
+  },
+  {
+    "name": "slide-display",
+    "value": "## Step 5: Add to GitHub CI/CD (npm)\n\n```yaml\nname: Verimu CRA Scan\non:\n  push:\n    branches: [main]\n  pull_request:\n\njobs:\n  verimu:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: \"20\"\n      - name: Run Verimu scan\n        env:\n          VERIMU_API_KEY: ${{ secrets.VERIMU_API_KEY }}\n        run: |\n          if [ ! -f package-lock.json ]; then\n            echo \"Missing package-lock.json. Run: npm install to generate it.\"\n            exit 2\n          fi\n          npx verimu scan --fail-on HIGH\n```"
+  },
+  {
+    "name": "author-speak-before",
+    "value": "Step six is the dashboard. In app dot verimu dot com, you can monitor vulnerabilities, dependencies, your S B O M archive, and contact alerts. That's it. Your onboarding is complete."
+  },
+  {
+    "name": "slide-display",
+    "value": "# You're live with Verimu\n\n- Dashboard: https://app.verimu.com/dashboard\n- Docs: https://verimu.com/docs\n- Need help? Book a free onboarding call: https://verimu.com/contact"
+  }
+]
