@@ -1,9 +1,13 @@
 package generator
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -150,12 +154,22 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 	renderer.RenderProgressToConsole(progress, "Generating audio for speaking actions...")
 	var audioManifest []types.AudioItem
 
+	// Provider switch: "elevenlabs" (default, cloud + S3) or "kokoro" (self-hosted
+	// codevideo-tts service, embedded as a data URI — no S3/cloud account needed).
+	provider := strings.ToLower(strings.TrimSpace(os.Getenv("CODEVIDEO_TTS_PROVIDER")))
+	if provider == "" {
+		provider = "elevenlabs"
+	}
 	ttsApiKey := os.Getenv("ELEVEN_LABS_API_KEY")
 	ttsVoiceId := resolveTTSVoiceID()
-	if ttsVoiceId == "" {
-		log.Printf("No explicit ElevenLabs voice ID found in env; ElevenLabs client default voice will be used")
+	if provider == "elevenlabs" {
+		if ttsVoiceId == "" {
+			log.Printf("No explicit ElevenLabs voice ID found in env; ElevenLabs client default voice will be used")
+		} else {
+			log.Printf("Using ElevenLabs voice ID from environment")
+		}
 	} else {
-		log.Printf("Using ElevenLabs voice ID from environment")
+		log.Printf("Using self-hosted TTS provider %q (audio embedded as data URI, no S3)", provider)
 	}
 
 	for i, action := range actions {
@@ -164,14 +178,23 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 		textHash := utils.Sha256Hash(fmt.Sprintf("%s::%s", ttsVoiceId, textToSpeak))
 		if strings.HasPrefix(action.Name, "author-speak") {
 			log.Printf("Converting text at step index %d to audio... (hash is %s)\n", i, textHash)
-			audioData, err := elevenlabs.GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId)
-			if err != nil {
-				return nil, fmt.Errorf("error converting text to audio: %w", err)
-			}
-			ctx := context.Background()
-			mp3Url, err := cloud.UploadFileToS3(ctx, audioData, "v3/audio", fmt.Sprintf("%s.mp3", textHash))
-			if err != nil {
-				return nil, fmt.Errorf("error uploading audio to S3: %w", err)
+			var mp3Url string
+			if provider == "kokoro" {
+				audioData, err := getAudioFromKokoro(textToSpeak)
+				if err != nil {
+					return nil, fmt.Errorf("error converting text to audio via kokoro: %w", err)
+				}
+				mp3Url = "data:audio/mpeg;base64," + base64.StdEncoding.EncodeToString(audioData)
+			} else {
+				audioData, err := elevenlabs.GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId)
+				if err != nil {
+					return nil, fmt.Errorf("error converting text to audio: %w", err)
+				}
+				ctx := context.Background()
+				mp3Url, err = cloud.UploadFileToS3(ctx, audioData, "v3/audio", fmt.Sprintf("%s.mp3", textHash))
+				if err != nil {
+					return nil, fmt.Errorf("error uploading audio to S3: %w", err)
+				}
 			}
 			audioManifest = append(audioManifest, types.AudioItem{
 				Text:   textToSpeak,
@@ -183,10 +206,46 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 		renderer.RenderProgressToConsole(progress, "Generating audio for speaking actions...")
 	}
 
-	log.Printf("Done with audio conversion and upload\n")
+	log.Printf("Done with audio conversion\n")
 	renderer.RenderProgressToConsole(10, "Done with audio generation")
 
 	return audioManifest, nil
+}
+
+// getAudioFromKokoro synthesizes speech via the self-hosted codevideo-tts
+// service (OpenAI-compatible POST /v1/audio/speech) and returns mp3 bytes.
+// TTS_SERVICE_URL points at the service (default http://localhost:3000); an
+// optional TTS_API_KEY is sent as a Bearer token.
+func getAudioFromKokoro(text string) ([]byte, error) {
+	base := strings.TrimRight(os.Getenv("TTS_SERVICE_URL"), "/")
+	if base == "" {
+		base = "http://localhost:3000"
+	}
+	payload, err := json.Marshal(map[string]interface{}{
+		"input":           text,
+		"response_format": "mp3",
+	})
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodPost, base+"/v1/audio/speech", bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if key := os.Getenv("TTS_API_KEY"); key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("could not reach TTS service at %s: %w", base, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("TTS service returned %d: %s", resp.StatusCode, string(body))
+	}
+	return io.ReadAll(resp.Body)
 }
 
 func resolveTTSVoiceID() string {

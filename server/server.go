@@ -381,6 +381,10 @@ func RunPuppeteerForUUID(uuid string, mode string) bool {
 	// Stream stdout concurrently.
 	go func() {
 		scanner := bufio.NewScanner(stdoutPipe)
+		// Allow very long lines: a manifest dump with data-URI audio (or Chrome
+		// dumpio) can exceed bufio's 64KB default. Hitting that limit kills the
+		// scanner, stops draining the pipe, and hangs the child on a full stdout.
+		scanner.Buffer(make([]byte, 1024*1024), 64*1024*1024)
 		for scanner.Scan() {
 			text := scanner.Text()
 			log.Printf("[Puppeteer stdout]: %s", text)
@@ -409,6 +413,7 @@ func RunPuppeteerForUUID(uuid string, mode string) bool {
 	// Stream stderr concurrently.
 	go func() {
 		scanner := bufio.NewScanner(stderrPipe)
+		scanner.Buffer(make([]byte, 1024*1024), 64*1024*1024)
 		for scanner.Scan() {
 			log.Printf("[Puppeteer stderr]: %s", scanner.Text())
 		}
