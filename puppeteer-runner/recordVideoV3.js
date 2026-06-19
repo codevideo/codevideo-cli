@@ -123,7 +123,8 @@ async function recordVideoV3() {
             `--window-size=${width},${height}`,
             '--start-fullscreen',
             // `--ozone-override-screen-size=${width},${height}`, // for linux
-            // '--no-sandbox', // to run as root on docker
+            '--no-sandbox', // Chrome's sandbox can't init as root (server/systemd) -> instant "Target closed" without this
+            '--disable-dev-shm-usage', // avoid crashes from a small /dev/shm on servers
             '--autoplay-policy=no-user-gesture-required',
             '--enable-extensions',
             // '--disable-web-security',
