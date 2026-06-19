@@ -21,31 +21,34 @@ function resolveChromeExecutable() {
         }
         return envPath;
     }
+    // Only the binary for THIS platform is valid — a stray cross-platform install
+    // (e.g. a mac Chrome copied onto a Linux box) must never be picked.
+    const macApp = "Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing";
+    let subpath;
+    if (process.platform === "darwin") {
+        subpath = process.arch === "arm64" ? `chrome-mac-arm64/${macApp}` : `chrome-mac-x64/${macApp}`;
+    } else if (process.platform === "win32") {
+        subpath = "chrome-win64/chrome.exe";
+    } else {
+        subpath = "chrome-linux64/chrome";
+    }
     const chromeRoot = path.join(__dirname, "chrome");
-    const candidateSubpaths = [
-        "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
-        "chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
-        "chrome-linux64/chrome",
-        "chrome-win64/chrome.exe",
-    ];
     if (fs.existsSync(chromeRoot)) {
         const versionDirs = fs.readdirSync(chromeRoot)
             .map(d => path.join(chromeRoot, d))
             .filter(d => fs.statSync(d).isDirectory())
             .sort()
-            .reverse(); // newest version tends to sort last, so check it first
+            .reverse(); // newest version first
         for (const dir of versionDirs) {
-            for (const sub of candidateSubpaths) {
-                const candidate = path.join(dir, sub);
-                if (fs.existsSync(candidate)) {
-                    return candidate;
-                }
+            const candidate = path.join(dir, subpath);
+            if (fs.existsSync(candidate)) {
+                return candidate;
             }
         }
     }
     throw new Error(
-        "No Chrome for Testing binary found under puppeteer-runner/chrome/ and " +
-        "CODEVIDEO_CHROME_PATH is not set.\n" +
+        `No Chrome for Testing binary for ${process.platform}/${process.arch} found under ` +
+        "puppeteer-runner/chrome/ and CODEVIDEO_CHROME_PATH is not set.\n" +
         "Install one with:  npx @puppeteer/browsers install chrome@latest\n" +
         "or set CODEVIDEO_CHROME_PATH to an existing Chrome/Chromium binary."
     );
