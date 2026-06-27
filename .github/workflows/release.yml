@@ -36,7 +36,7 @@ jobs:
 
       - name: Install npm workspace
         working-directory: npm
-        run: npm ci
+        run: npm ci --omit=optional
 
       - name: Build and verify release packages
         working-directory: npm

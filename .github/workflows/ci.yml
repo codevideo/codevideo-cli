@@ -24,6 +24,6 @@ jobs:
       - run: npm install --global npm@11.14.1
       - run: go test ./...
       - working-directory: npm
-        run: npm ci
+        run: npm ci --omit=optional
       - working-directory: npm
         run: npm run release:check
