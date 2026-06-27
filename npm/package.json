@@ -1,0 +1,22 @@
+{
+  "name": "codevideo-cli-npm-workspace",
+  "private": true,
+  "version": "0.0.7",
+  "type": "module",
+  "workspaces": [
+    "packages/codevideo-cli"
+  ],
+  "scripts": {
+    "build:binaries": "node scripts/build-binaries.mjs",
+    "prepare:packages": "node scripts/prepare-packages.mjs",
+    "verify:packages": "node scripts/verify-packages.mjs",
+    "test": "node --test test/*.test.mjs",
+    "pack:packages": "node scripts/pack-packages.mjs",
+    "smoke:packed": "node scripts/smoke-packed-install.mjs",
+    "publish:packages": "node scripts/publish-packages.mjs",
+    "release:check": "npm run build:binaries && npm run prepare:packages && npm test && npm run verify:packages && npm run pack:packages && npm run smoke:packed"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

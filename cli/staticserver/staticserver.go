@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"net"
 
 	log "github.com/sirupsen/logrus"
 
@@ -18,11 +19,13 @@ import (
 
 // Server serves static files from the embedded public folder.
 type Server struct {
-	Port           int
-	serverURL      string
-	startupTimeout time.Duration
-	httpServer     *http.Server
-	manifestServer *http.Server
+	Port             int
+	serverURL        string
+	startupTimeout   time.Duration
+	httpServer       *http.Server
+	manifestServer   *http.Server
+	staticListener   net.Listener
+	manifestListener net.Listener
 }
 
 //go:embed public
@@ -100,33 +103,67 @@ func (s *Server) StartServer(ctx context.Context) error {
 		Handler: corsMiddleware(manifestMux),
 	}
 
-	// Start the servers in a separate goroutine.
+	staticListener, err := net.Listen("tcp", s.httpServer.Addr)
+	if err != nil {
+		return fmt.Errorf("static server port %d is unavailable: %w", s.Port, err)
+	}
+	s.staticListener = staticListener
+
+	manifestListener, manifestErr := net.Listen("tcp", s.manifestServer.Addr)
+	if manifestErr != nil {
+		log.Printf(
+			"Manifest server port %d is unavailable; the Puppeteer runner will load the manifest directly: %v",
+			constants.DEFAULT_MANIFEST_SERVER_PORT,
+			manifestErr,
+		)
+		s.manifestServer = nil
+	} else {
+		s.manifestListener = manifestListener
+	}
+
+	// Start the servers in separate goroutines after both ports are reserved.
 	go func() {
-		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := s.httpServer.Serve(staticListener); err != nil && err != http.ErrServerClosed {
 			fmt.Printf("HTTP server error: %v\n", err)
 		}
 	}()
 
-	go func() {
-		if err := s.manifestServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("Manifest server error: %v\n", err)
-		}
-	}()
+	if s.manifestServer != nil {
+		go func() {
+			if err := s.manifestServer.Serve(manifestListener); err != nil && err != http.ErrServerClosed {
+				fmt.Printf("Manifest server error: %v\n", err)
+			}
+		}()
+	}
 
 	return nil
 }
 
+// ManifestServerStarted reports whether the legacy HTTP manifest endpoint is
+// available. The Puppeteer runner reads the explicit manifest path directly.
+func (s *Server) ManifestServerStarted() bool {
+	return s.manifestServer != nil && s.manifestListener != nil
+}
+
 // Stop gracefully shuts down the HTTP server.
 func (s *Server) Stop() error {
+	var stopError error
 	if s.httpServer != nil {
 		// Give the server a few seconds to shut down gracefully.
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := s.httpServer.Shutdown(ctx); err != nil {
-			return fmt.Errorf("failed to shutdown server: %w", err)
+			stopError = fmt.Errorf("failed to shutdown static server: %w", err)
 		}
 	}
-	return nil
+	if s.manifestServer != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.manifestServer.Shutdown(ctx); err != nil && stopError == nil {
+			stopError = fmt.Errorf("failed to shutdown manifest server: %w", err)
+		}
+	}
+	return stopError
 }
 
 // waitForServerReady polls the server URL until it's responding or times out.
@@ -163,17 +200,8 @@ func getManifestV3Handler(w http.ResponseWriter, r *http.Request) {
 	uuid := r.URL.Query().Get("uuid")
 	log.Println("return manifest for uuid", uuid)
 
-	// get absolute path of 'new' folder
-	newAbsPath, err := filepath.Abs(constants.NEW_FOLDER)
-	if err != nil {
-		log.Fatalf("Error getting absolute path of %s: %v", constants.NEW_FOLDER, err)
-	}
-
-	// get absolute path of 'success' folder
-	successAbsPath, err := filepath.Abs(constants.SUCCESS_FOLDER)
-	if err != nil {
-		log.Fatalf("Error getting absolute path of %s: %v", constants.SUCCESS_FOLDER, err)
-	}
+	newAbsPath := constants.NewFolder()
+	successAbsPath := constants.SuccessFolder()
 
 	// Try to find the file in the new folder first
 	file := filepath.Join(newAbsPath, fmt.Sprintf("%s.json", uuid))

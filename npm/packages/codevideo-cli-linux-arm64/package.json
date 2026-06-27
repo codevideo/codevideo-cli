@@ -1,0 +1,11 @@
+{
+  "name": "@fullstackcraftllc/codevideo-cli-linux-arm64",
+  "version": "0.0.7",
+  "description": "CodeVideo CLI native binary for Linux ARM64.",
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "files": ["bin/", "LICENSE"],
+  "repository": { "type": "git", "url": "git+https://github.com/codevideo/codevideo-cli.git", "directory": "npm/packages/codevideo-cli-linux-arm64" },
+  "license": "MIT",
+  "publishConfig": { "access": "public" }
+}

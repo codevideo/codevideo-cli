@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/codevideo/codevideo-cli/constants"
 	"github.com/codevideo/codevideo-cli/types"
 	"github.com/spf13/cobra"
 )
@@ -103,10 +104,10 @@ func (c *Config) EnsureOutputDirs() error {
 
 	// Create temp directories for processing
 	tempDirs := []string{
-		filepath.Join(os.TempDir(), "codevideo", "new"),
-		filepath.Join(os.TempDir(), "codevideo", "error"),
-		filepath.Join(os.TempDir(), "codevideo", "success"),
-		filepath.Join(os.TempDir(), "codevideo", "video"),
+		constants.NewFolder(),
+		constants.ErrorFolder(),
+		constants.SuccessFolder(),
+		constants.VideoFolder(),
 	}
 
 	for _, dir := range tempDirs {
@@ -120,7 +121,7 @@ func (c *Config) EnsureOutputDirs() error {
 
 // GetTempDir returns the path to a specific temporary directory
 func (c *Config) GetTempDir(dirType string) string {
-	return filepath.Join(os.TempDir(), "codevideo", dirType)
+	return filepath.Join(constants.WorkFolder(), dirType)
 }
 
 // GenerateOutputPath generates the full path for an output file

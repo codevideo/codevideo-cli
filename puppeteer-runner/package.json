@@ -11,7 +11,6 @@
   "description": "",
   "dependencies": {
     "@puppeteer/browsers": "^2.10.9",
-    "chromium": "^3.0.3",
     "puppeteer-stream": "^3.0.22",
     "yargs": "^17.7.2"
   }

@@ -3,56 +3,10 @@ const fs = require("fs");
 const path = require("path");
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
+const { resolveChromeExecutable } = require('./runtimePaths');
 
 // define sleep helper function
 const sleep = ms => new Promise(res => setTimeout(res, ms));
-
-// Resolve the Chrome for Testing executable instead of hardcoding a version
-// path (which breaks on every Chrome update). Order of resolution:
-//   1. CODEVIDEO_CHROME_PATH env var (explicit override)
-//   2. the newest chrome/<platform>-<version>/ install under puppeteer-runner,
-//      across mac/linux/win binary layouts
-// Install one with: npx @puppeteer/browsers install chrome@latest
-function resolveChromeExecutable() {
-    const envPath = process.env.CODEVIDEO_CHROME_PATH;
-    if (envPath) {
-        if (!fs.existsSync(envPath)) {
-            throw new Error(`CODEVIDEO_CHROME_PATH is set to "${envPath}" but no file exists there.`);
-        }
-        return envPath;
-    }
-    // Only the binary for THIS platform is valid — a stray cross-platform install
-    // (e.g. a mac Chrome copied onto a Linux box) must never be picked.
-    const macApp = "Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing";
-    let subpath;
-    if (process.platform === "darwin") {
-        subpath = process.arch === "arm64" ? `chrome-mac-arm64/${macApp}` : `chrome-mac-x64/${macApp}`;
-    } else if (process.platform === "win32") {
-        subpath = "chrome-win64/chrome.exe";
-    } else {
-        subpath = "chrome-linux64/chrome";
-    }
-    const chromeRoot = path.join(__dirname, "chrome");
-    if (fs.existsSync(chromeRoot)) {
-        const versionDirs = fs.readdirSync(chromeRoot)
-            .map(d => path.join(chromeRoot, d))
-            .filter(d => fs.statSync(d).isDirectory())
-            .sort()
-            .reverse(); // newest version first
-        for (const dir of versionDirs) {
-            const candidate = path.join(dir, subpath);
-            if (fs.existsSync(candidate)) {
-                return candidate;
-            }
-        }
-    }
-    throw new Error(
-        `No Chrome for Testing binary for ${process.platform}/${process.arch} found under ` +
-        "puppeteer-runner/chrome/ and CODEVIDEO_CHROME_PATH is not set.\n" +
-        "Install one with:  npx @puppeteer/browsers install chrome@latest\n" +
-        "or set CODEVIDEO_CHROME_PATH to an existing Chrome/Chromium binary."
-    );
-}
 
 // Parse command line arguments
 const argv = yargs(hideBin(process.argv))
@@ -79,6 +33,14 @@ const argv = yargs(hideBin(process.argv))
     type: 'boolean',
     default: false,
     description: 'Run in non-headless mode for debugging'
+  })
+  .option('output-webm', {
+    type: 'string',
+    description: 'Absolute output path for the recorded WebM file'
+  })
+  .option('manifest-path', {
+    type: 'string',
+    description: 'Absolute path to the render manifest'
   })
   .argv;
 
@@ -108,7 +70,10 @@ async function recordVideoV3() {
     console.log("Starting recording for UUID: ", uuid);
     console.log("Debug mode:", debug ? "ENABLED - Browser will be visible" : "disabled");
 
-    const outputWebm = path.join(__dirname, `../../tmp/v3/video/${uuid}.webm`);
+    const outputWebm = argv.outputWebm
+        ? path.resolve(argv.outputWebm)
+        : path.join(__dirname, `../../tmp/v3/video/${uuid}.webm`);
+    fs.mkdirSync(path.dirname(outputWebm), { recursive: true });
     const file = fs.createWriteStream(outputWebm);
 
     console.log("Launching browser with resolution:", width, "x", height, orientation, width === 3840 ? " (4K)" : " (1080p)");
@@ -135,6 +100,32 @@ async function recordVideoV3() {
     });
 
     const page = await browser.newPage();
+
+    if (argv.manifestPath) {
+        const manifestPath = path.resolve(argv.manifestPath);
+        await page.setRequestInterception(true);
+        page.on('request', request => {
+            const requestedUrl = new URL(request.url());
+            const isManifestRequest = requestedUrl.hostname === 'localhost'
+                && requestedUrl.port === '7000'
+                && requestedUrl.pathname === '/get-manifest-v3';
+            if (!isManifestRequest) {
+                request.continue();
+                return;
+            }
+            try {
+                request.respond({
+                    status: 200,
+                    contentType: 'application/json',
+                    headers: { 'Access-Control-Allow-Origin': '*' },
+                    body: fs.readFileSync(manifestPath)
+                });
+            } catch (error) {
+                console.error(`Unable to read manifest at ${manifestPath}:`, error);
+                request.respond({ status: 500, body: 'Manifest unavailable' });
+            }
+        });
+    }
 
     // Log domcontentloaded
     page.once('domcontentloaded', () => {
@@ -250,4 +241,5 @@ async function recordVideoV3() {
 
 recordVideoV3().catch(err => {
     console.error("Error during recording:", err);
+    process.exitCode = 1;
 });

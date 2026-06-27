@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -43,8 +44,13 @@ func ConvertToMp4(input, output string, mode string) error {
 
 	log.Printf("Converting from %s to %s", inputAbs, outputAbs)
 
+	ffmpegPath, err := ResolveFFmpegPath()
+	if err != nil {
+		return err
+	}
+
 	// Construct the ffmpeg command with the -progress flag.
-	cmd := exec.Command("ffmpeg",
+	cmd := exec.Command(ffmpegPath,
 		"-y",           // Overwrite output if exists
 		"-i", inputAbs, // Input file (absolute path)
 		"-c:v", "libx264", // Video codec
@@ -107,4 +113,24 @@ func ConvertToMp4(input, output string, mode string) error {
 	renderer.RenderProgressToConsole(100, "")
 
 	return nil
+}
+
+// ResolveFFmpegPath resolves the external FFmpeg executable without running it.
+func ResolveFFmpegPath() (string, error) {
+	ffmpegPath := os.Getenv("CODEVIDEO_FFMPEG_PATH")
+	if ffmpegPath == "" {
+		resolved, err := exec.LookPath("ffmpeg")
+		if err != nil {
+			return "", fmt.Errorf("ffmpeg is required: install it on PATH or set CODEVIDEO_FFMPEG_PATH")
+		}
+		return resolved, nil
+	}
+	if !filepath.IsAbs(ffmpegPath) {
+		return "", fmt.Errorf("CODEVIDEO_FFMPEG_PATH must be absolute: %s", ffmpegPath)
+	}
+	info, err := os.Stat(ffmpegPath)
+	if err != nil || info.IsDir() || (runtime.GOOS != "windows" && info.Mode().Perm()&0111 == 0) {
+		return "", fmt.Errorf("CODEVIDEO_FFMPEG_PATH is not an executable file: %s", ffmpegPath)
+	}
+	return ffmpegPath, nil
 }

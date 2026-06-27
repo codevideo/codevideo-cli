@@ -121,15 +121,7 @@ func (g *Generator) SaveManifest(manifest *types.CodeVideoManifest) (string, err
 		return "", fmt.Errorf("failed to marshal manifest: %w", err)
 	}
 
-	// Get executable directory
-	execPath, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("failed to get executable path: %w", err)
-	}
-	execDir := filepath.Dir(execPath)
-
-	// Create absolute path to NEW_FOLDER directory relative to executable
-	newFolderPath := filepath.Join(execDir, constants.NEW_FOLDER)
+	newFolderPath := constants.NewFolder()
 
 	// Ensure directory exists
 	if err := os.MkdirAll(newFolderPath, 0755); err != nil {

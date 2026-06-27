@@ -36,7 +36,7 @@ var debounceMap = make(map[string]*time.Timer)
 // When a new manifest file is detected, it is processed as a job.
 func WatchForManifestFiles() {
 	// Ensure required directories exist.
-	for _, dir := range []string{constants.NEW_FOLDER, constants.ERROR_FOLDER, constants.SUCCESS_FOLDER, constants.VIDEO_FOLDER} {
+	for _, dir := range []string{constants.NewFolder(), constants.ErrorFolder(), constants.SuccessFolder(), constants.VideoFolder()} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			log.Fatalf("Error creating directory %s: %v", dir, err)
 		}
@@ -49,7 +49,7 @@ func WatchForManifestFiles() {
 	}
 	defer watcher.Close()
 
-	if err := watcher.Add(constants.NEW_FOLDER); err != nil {
+	if err := watcher.Add(constants.NewFolder()); err != nil {
 		log.Fatal(err)
 	}
 
@@ -58,13 +58,7 @@ func WatchForManifestFiles() {
 	log.Printf("Worker concurrency limit: %d", maxConcurrentJobs)
 	semaphore := make(chan struct{}, maxConcurrentJobs)
 
-	// get absolute path of 'new' folder
-	absPath, err := filepath.Abs(constants.NEW_FOLDER)
-	if err != nil {
-		log.Fatalf("Error getting absolute path of %s: %v", constants.NEW_FOLDER, err)
-	}
-
-	log.Println("Watching for new manifest files in", absPath)
+	log.Println("Watching for new manifest files in", constants.NewFolder())
 
 	// Listen for filesystem events.
 	for {
@@ -127,32 +121,21 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 	uuid := manifest.UUID
 	clerkUserId := manifest.UserID
 
-	// Call the Puppeteer script using node with the uuid and operating system as arguments.
-	puppeteerFailed := RunPuppeteerForUUID(uuid, mode)
-	if puppeteerFailed {
-		log.Printf("Puppeteer recording failed for job %s", uuid)
-		utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
-		return
-	}
-
-	// Get the executable path
-	execPath, err := os.Executable()
-	if err != nil {
-		log.Printf("Failed to get executable path: %v", err)
-		utils.AddErrorToManifest(manifestPath, err.Error())
-		return
-	}
-	execDir := filepath.Dir(execPath)
-
-	// Create absolute paths for video files
-	videoFolder := filepath.Join(execDir, constants.VIDEO_FOLDER)
+	videoFolder := constants.VideoFolder()
 	if err := os.MkdirAll(videoFolder, 0755); err != nil {
 		log.Printf("Failed to create video folder: %v", err)
 		utils.AddErrorToManifest(manifestPath, err.Error())
 		return
 	}
-
 	webmPath := filepath.Join(videoFolder, uuid+".webm")
+
+	// Call the Puppeteer script using node with the uuid and explicit output path.
+	puppeteerFailed := RunPuppeteerForUUID(uuid, mode, manifestPath, webmPath)
+	if puppeteerFailed {
+		log.Printf("Puppeteer recording failed for job %s", uuid)
+		utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
+		return
+	}
 
 	// Use the provided outputPath if it's not empty, otherwise use the default
 	var mp4Path string
@@ -207,7 +190,7 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 	}
 
 	// serve or cli mode, move the manifest to the success folder.
-	if err := files.MoveFile(manifestPath, filepath.Join(constants.SUCCESS_FOLDER, base)); err != nil {
+	if err := files.MoveFile(manifestPath, filepath.Join(constants.SuccessFolder(), base)); err != nil {
 		log.Printf("Failed to move manifest to success folder: %v", err)
 	} else {
 		log.Printf("Job %s processed successfully", uuid)
@@ -230,7 +213,7 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 			now := time.Now()
 			formattedTime := now.Format("2006-01-02-15-04-05")
 			finalizedFileName := "CodeVideo-" + formattedTime + ".mp4"
-			finalizedFilePath := filepath.Join(execDir, finalizedFileName)
+			finalizedFilePath := filepath.Join(constants.OutputFolder(), finalizedFileName)
 
 			// Copy the file to the root directory
 			if err := utils.CopyFile(mp4Path, finalizedFilePath); err != nil {
@@ -289,7 +272,7 @@ func updateClerkUserData(environment string, clerkUserId string, manifestPath st
 		utils.AddErrorToManifest(manifestPath, err.Error())
 		log.Printf("Failed to add error to manifest file: %v", err)
 
-		if err := files.MoveFile(manifestPath, filepath.Join(constants.ERROR_FOLDER, base)); err != nil {
+		if err := files.MoveFile(manifestPath, filepath.Join(constants.ErrorFolder(), base)); err != nil {
 			log.Printf("Failed to move manifest to error folder: %v", err)
 		}
 		return true
@@ -327,25 +310,16 @@ func updateClerkUserData(environment string, clerkUserId string, manifestPath st
 	return false
 }
 
-func RunPuppeteerForUUID(uuid string, mode string) bool {
+func RunPuppeteerForUUID(uuid string, mode string, manifestPath string, webmOutputPath string) bool {
 	// Access the global configuration
 	resolution := config.GlobalConfig.Resolution
 	orientation := config.GlobalConfig.Orientation
 
-	// Get the executable path
-	execPath, err := os.Executable()
-	if err != nil {
-		log.Printf("Failed to get executable path: %v", err)
-		return true
-	}
-	execDir := filepath.Dir(execPath)
-
-	// Construct the node script path relative to the executable
-	nodeScriptPath := filepath.Join(execDir, constants.NODE_SCRIPT_NAME)
+	nodeScriptPath := constants.PuppeteerRunnerPath()
 
 	// Check if the script exists
-	if _, err := os.Stat(nodeScriptPath); os.IsNotExist(err) {
-		log.Fatalf("Node script not found at %s", nodeScriptPath)
+	if _, err := os.Stat(nodeScriptPath); err != nil {
+		log.Printf("Node script is unavailable at %s: %v", nodeScriptPath, err)
 		return true
 	}
 
@@ -355,7 +329,9 @@ func RunPuppeteerForUUID(uuid string, mode string) bool {
 		"--uuid", uuid,
 		"--os", os.Getenv("OPERATING_SYSTEM"),
 		"--resolution", resolution,
-		"--orientation", orientation)
+		"--orientation", orientation,
+		"--manifest-path", manifestPath,
+		"--output-webm", webmOutputPath)
 
 	// Add debug flag if enabled
 	if config.GlobalConfig.Debug {
@@ -425,7 +401,7 @@ func RunPuppeteerForUUID(uuid string, mode string) bool {
 	// Wait for the command to finish.
 	if err := cmd.Wait(); err != nil {
 		log.Printf("Job %s failed: %v", uuid, err)
-		// Optionally capture additional output if needed.
+		return true
 	}
 	return false
 }

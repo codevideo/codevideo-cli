@@ -18,3 +18,11 @@ nohup.out
 
 # chrome versions in puppeteer-runner
 puppeteer-runner/chrome
+
+# generated npm release artifacts
+npm/node_modules
+npm/dist
+npm/packages/codevideo-cli-*/bin/codevideo-cli*
+npm/packages/codevideo-cli/runtime/recordVideoV3.js
+npm/packages/codevideo-cli/runtime/runtimePaths.js
+npm/packages/*/LICENSE

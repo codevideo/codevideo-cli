@@ -1,0 +1,52 @@
+{
+  "name": "@fullstackcraftllc/codevideo-cli",
+  "version": "0.0.7",
+  "description": "Cross-platform npm distribution of the CodeVideo CLI.",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    }
+  },
+  "bin": {
+    "codevideo-cli": "bin/codevideo-cli.js"
+  },
+  "files": [
+    "bin/",
+    "runtime/",
+    "index.js",
+    "index.d.ts",
+    "doctor.js",
+    "install-browser.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@puppeteer/browsers": "^2.10.9",
+    "puppeteer-stream": "^3.0.22",
+    "yargs": "^17.7.2"
+  },
+  "optionalDependencies": {
+    "@fullstackcraftllc/codevideo-cli-darwin-arm64": "0.0.7",
+    "@fullstackcraftllc/codevideo-cli-darwin-x64": "0.0.7",
+    "@fullstackcraftllc/codevideo-cli-linux-arm64": "0.0.7",
+    "@fullstackcraftllc/codevideo-cli-linux-x64": "0.0.7",
+    "@fullstackcraftllc/codevideo-cli-win32-arm64": "0.0.7",
+    "@fullstackcraftllc/codevideo-cli-win32-x64": "0.0.7"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codevideo/codevideo-cli.git",
+    "directory": "npm/packages/codevideo-cli"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

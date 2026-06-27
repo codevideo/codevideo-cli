@@ -2,7 +2,27 @@
 
 The CLI tool for generating CodeVideos.
 
-## Installation
+## npm installation
+
+The npm wrapper installs only the native binary for your operating system and architecture:
+
+```shell
+npx @fullstackcraftllc/codevideo-cli doctor
+npx @fullstackcraftllc/codevideo-cli install-browser # only when Chrome is not already installed
+npx @fullstackcraftllc/codevideo-cli --version
+```
+
+Rendering requires Node.js 20 or newer, Chrome/Chromium, and FFmpeg. Chrome is detected from `CODEVIDEO_CHROME_PATH`, the managed CodeVideo browser cache, or common system locations. FFmpeg is resolved from `CODEVIDEO_FFMPEG_PATH` and then `PATH`.
+
+The wrapper supports these optional runtime locations:
+
+- `CODEVIDEO_PUPPETEER_RUNNER_PATH`
+- `CODEVIDEO_WORK_DIR`
+- `CODEVIDEO_LOG_DIR`
+- `CODEVIDEO_OUTPUT_DIR`
+- `CODEVIDEO_BROWSER_CACHE_DIR`
+
+## Source installation
 
 ```shell
 git clone https://github.com/codevideo/codevideo
@@ -25,7 +45,7 @@ Very importantly, create a `.env` file with your Elevenlabs API key:
 
 ```env
 # Copy from .env.example and fill in your values
-ELEVENLABS_API_KEY=your-elevenlabs-api-key
+ELEVEN_LABS_API_KEY=your-elevenlabs-api-key
 # ... other configuration options
 ```
 
@@ -135,3 +155,23 @@ Everything in the `public` folder is treated as an embedded Go resource and serv
 ## CodeVideo Studio
 
 Build your actions JSON in the [CodeVideo Studio](https://studio.codevideo.io)!
+
+## Deployment
+
+Set `NPM_TOKEN` as a repository variable in Github.
+
+Then run the following command to deploy:
+
+```shell
+go test ./...
+
+cd npm
+npm ci
+npm run release:check
+```
+
+```shell
+git tag -a v0.0.7 -m "Release codevideo-cli 0.0.7"
+git push origin main
+git push origin v0.0.7
+```

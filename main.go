@@ -18,8 +18,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// const for version string
-const version = "0.0.3"
+// version is injected by release builds with -ldflags "-X main.version=...".
+var version = "dev"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -45,7 +45,9 @@ var rootCmd = &cobra.Command{
 			log.Fatalf("Error starting static server: %v", err)
 		}
 		defer srv.Stop()
-		log.Printf("Manifest server started on port %d", constants.DEFAULT_MANIFEST_SERVER_PORT)
+		if srv.ManifestServerStarted() {
+			log.Printf("Manifest server started on port %d", constants.DEFAULT_MANIFEST_SERVER_PORT)
+		}
 		log.Printf("Static server started on port %d", constants.DEFAULT_GATSBY_PORT)
 
 		mode, _ := cmd.Flags().GetString("mode")
@@ -72,13 +74,11 @@ func setupLogging(cmd *cobra.Command) {
 		log.SetLevel(log.InfoLevel)
 	}
 
-	// Get executable directory for log file location
-	execPath, err := os.Executable()
-	if err != nil {
-		log.Fatalf("Error getting executable path: %v", err)
+	logDir := constants.LogFolder()
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		log.Fatalf("Error creating log directory %s: %v", logDir, err)
 	}
-	execDir := filepath.Dir(execPath)
-	logPath := filepath.Join(execDir, "codevideo.log")
+	logPath := filepath.Join(logDir, "codevideo.log")
 
 	// Setup rotating log file
 	logRotate := &lumberjack.Logger{
@@ -142,12 +142,13 @@ func main() {
 	// Get the directory of the executable
 	execDir := filepath.Dir(execPath)
 
-	// Try to load .env from the executable directory
-	if err := godotenv.Load(filepath.Join(execDir, ".env")); err != nil {
-		// Fall back to .env.example if .env is not found
-		if err := godotenv.Load(filepath.Join(execDir, ".env.example")); err != nil {
-			log.Printf("Warning: No .env or .env.example file found in %s", execDir)
+	if configured := os.Getenv("CODEVIDEO_ENV_FILE"); configured != "" {
+		if err := godotenv.Load(configured); err != nil {
+			log.Printf("Warning: failed to load CODEVIDEO_ENV_FILE %s: %v", configured, err)
 		}
+	} else if err := godotenv.Load(filepath.Join(execDir, ".env")); err != nil {
+		// Preserve the source-install fallback without warning for npm installs.
+		_ = godotenv.Load(filepath.Join(execDir, ".env.example"))
 	}
 
 	// Execute the root command
