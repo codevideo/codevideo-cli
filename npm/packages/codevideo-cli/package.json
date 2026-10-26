@@ -1,6 +1,6 @@
 {
   "name": "@fullstackcraftllc/codevideo-cli",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Cross-platform npm distribution of the CodeVideo CLI.",
   "type": "module",
   "main": "index.js",
@@ -33,12 +33,12 @@
     "yargs": "^17.7.2"
   },
   "optionalDependencies": {
-    "@fullstackcraftllc/codevideo-cli-darwin-arm64": "0.0.7",
-    "@fullstackcraftllc/codevideo-cli-darwin-x64": "0.0.7",
-    "@fullstackcraftllc/codevideo-cli-linux-arm64": "0.0.7",
-    "@fullstackcraftllc/codevideo-cli-linux-x64": "0.0.7",
-    "@fullstackcraftllc/codevideo-cli-win32-arm64": "0.0.7",
-    "@fullstackcraftllc/codevideo-cli-win32-x64": "0.0.7"
+    "@fullstackcraftllc/codevideo-cli-darwin-arm64": "0.0.8",
+    "@fullstackcraftllc/codevideo-cli-darwin-x64": "0.0.8",
+    "@fullstackcraftllc/codevideo-cli-linux-arm64": "0.0.8",
+    "@fullstackcraftllc/codevideo-cli-linux-x64": "0.0.8",
+    "@fullstackcraftllc/codevideo-cli-win32-arm64": "0.0.8",
+    "@fullstackcraftllc/codevideo-cli-win32-x64": "0.0.8"
   },
   "repository": {
     "type": "git",

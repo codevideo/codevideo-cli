@@ -1,6 +1,6 @@
 {
   "name": "@fullstackcraftllc/codevideo-cli-linux-arm64",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "CodeVideo CLI native binary for Linux ARM64.",
   "os": ["linux"],
   "cpu": ["arm64"],
