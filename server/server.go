@@ -107,6 +107,25 @@ func WatchForManifestFiles() {
 // ProcessJob reads the manifest file, calls the Puppeteer script, sends an email if successful,
 // and moves the manifest to the error or success folder.
 func ProcessJob(manifestPath string, mode string, outputPath string) error {
+	err := processJob(manifestPath, mode, outputPath)
+	// A failed serve job used to stay in new/ (the watcher only reacts to new files,
+	// so it was never retried) unless the failure was the email step. Every failure
+	// now records its error in the manifest and lands in error/. Its webm/mp4 stay in
+	// the video folder for debugging; the API sweeps that folder after a day.
+	if err != nil && mode == "serve" {
+		moveManifestToErrorFolder(manifestPath)
+	}
+	return err
+}
+
+func moveManifestToErrorFolder(manifestPath string) {
+	target := filepath.Join(constants.ErrorFolder(), filepath.Base(manifestPath))
+	if err := files.MoveFile(manifestPath, target); err != nil && !os.IsNotExist(err) {
+		log.Printf("Failed to move manifest to error folder: %v", err)
+	}
+}
+
+func processJob(manifestPath string, mode string, outputPath string) error {
 	// still at 10 from the audio generation step
 	if mode == "cli" {
 		renderer.RenderProgressToConsole(10, "Starting up video recording...")
@@ -293,13 +312,8 @@ func updateClerkUserData(environment string, clerkUserId string, manifestPath st
 	if err := mail.SendEmail(userEmail, mp4Url); err != nil {
 		log.Printf("Failed to send email for job %s: %v", uuid, err)
 
-		// add an error key and value to the manifest file.
+		// add an error key and value to the manifest file; ProcessJob moves it to error/.
 		utils.AddErrorToManifest(manifestPath, err.Error())
-		log.Printf("Failed to add error to manifest file: %v", err)
-
-		if err := files.MoveFile(manifestPath, filepath.Join(constants.ErrorFolder(), base)); err != nil {
-			log.Printf("Failed to move manifest to error folder: %v", err)
-		}
 		return true
 	}
 
