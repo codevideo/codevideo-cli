@@ -13,7 +13,7 @@ on:
       release_tag:
         description: Existing committed release tag to publish (never a branch)
         required: true
-        default: v0.0.11
+        default: v0.0.12
         type: string
 
 concurrency:
@@ -122,11 +122,12 @@ jobs:
 
       # The empty-queue check above never launches Chromium, so a recorder that
       # cannot start (0.0.8/0.0.9: Chromium 124 lacked Extensions.loadUnpacked)
-      # still passed. Render a narration-free manifest for real and require the
-      # mp4. Networking stays on because the page loads Monaco from its CDN; the
-      # container has no S3, Clerk or mail credentials, so the job stops at the
-      # upload step and touches nothing outside the runner.
-      - name: Smoke-test a realtime render
+      # still passed. Render narration-free manifests for real and require each
+      # mp4: one landscape, and one portrait job that sets its own orientation the
+      # way API requests do. Networking stays on because the page loads Monaco from
+      # its CDN; the container has no S3, Clerk or mail credentials, so each job
+      # stops at the upload step and touches nothing outside the runner.
+      - name: Smoke-test realtime renders
         run: |
           trap 'docker logs --tail=80 codevideo-render-smoke 2>&1 | grep -vE "bus\.cc|dbus|ffmpeg output"; docker rm -f codevideo-render-smoke' EXIT
           docker run -d --name codevideo-render-smoke -e CODEVIDEO_WORK_DIR=/tmp/smoke-queue codevideo-cli:smoke
@@ -134,27 +135,33 @@ jobs:
             docker logs codevideo-render-smoke 2>&1 | grep -q 'Watching for new manifest files' && break
             sleep 2
           done
-          docker exec codevideo-render-smoke sh -ec '
-            mkdir -p /tmp/smoke-queue/new
-            printf "%s" "{\"environment\":\"staging\",\"userId\":\"smoke-test\",\"uuid\":\"smoke-render\",\"audioItems\":[],\"actions\":[{\"name\":\"file-explorer-create-file\",\"value\":\"index.js\"},{\"name\":\"file-explorer-open-file\",\"value\":\"index.js\"},{\"name\":\"editor-type\",\"value\":\"console.log(1 + 1);\"}]}" > /tmp/smoke-queue/new/.smoke-render.tmp
-            mv /tmp/smoke-queue/new/.smoke-render.tmp /tmp/smoke-queue/new/smoke-render.json'
-          for attempt in {1..90}; do
-            logs=$(docker logs codevideo-render-smoke 2>&1)
-            if grep -q 'Converted webm to mp4 for job smoke-render' <<<"$logs"; then
-              docker exec codevideo-render-smoke sh -ec '
-                duration=$(ffprobe -v error -show_entries format=duration -of csv=p=0 /tmp/smoke-queue/video/smoke-render.mp4)
-                echo "smoke render duration: ${duration}s"
-                awk -v d="$duration" "BEGIN { exit !(d > 1) }"'
-              exit 0
-            fi
-            if grep -qE 'Puppeteer recording failed|Failed to convert webm' <<<"$logs"; then
-              echo "::error::Realtime smoke render failed"
-              exit 1
-            fi
-            sleep 2
-          done
-          echo "::error::Realtime smoke render did not finish within 3 minutes"
-          exit 1
+          actions='[{"name":"file-explorer-create-file","value":"index.js"},{"name":"file-explorer-open-file","value":"index.js"},{"name":"editor-type","value":"console.log(1 + 1);"}]'
+          # Queue the manifest on stdin as job $1 and require an mp4 of size $2
+          # that lasts over a second.
+          smoke_render() {
+            docker exec -i codevideo-render-smoke sh -ec "mkdir -p /tmp/smoke-queue/new && cat > /tmp/smoke-queue/new/.$1.tmp && mv /tmp/smoke-queue/new/.$1.tmp /tmp/smoke-queue/new/$1.json"
+            for attempt in {1..90}; do
+              logs=$(docker logs codevideo-render-smoke 2>&1)
+              if grep -q "Converted webm to mp4 for job $1" <<<"$logs"; then
+                mp4=/tmp/smoke-queue/video/$1.mp4
+                size=$(docker exec codevideo-render-smoke ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$mp4")
+                duration=$(docker exec codevideo-render-smoke ffprobe -v error -show_entries format=duration -of csv=p=0 "$mp4")
+                echo "$1: ${size}, ${duration}s"
+                [ "$size" = "$2" ] || { echo "::error::$1 rendered at $size, expected $2"; return 1; }
+                awk -v d="$duration" 'BEGIN { exit !(d > 1) }' || { echo "::error::$1 is only ${duration}s long"; return 1; }
+                return 0
+              fi
+              if grep -qE "Puppeteer recording failed|Failed to convert webm" <<<"$logs"; then
+                echo "::error::Realtime smoke render $1 failed"
+                return 1
+              fi
+              sleep 2
+            done
+            echo "::error::Realtime smoke render $1 did not finish within 3 minutes"
+            return 1
+          }
+          smoke_render smoke-render 1920x1080 <<<"{\"environment\":\"staging\",\"userId\":\"smoke-test\",\"uuid\":\"smoke-render\",\"audioItems\":[],\"actions\":$actions}"
+          smoke_render smoke-portrait 1080x1920 <<<"{\"environment\":\"staging\",\"userId\":\"smoke-test\",\"uuid\":\"smoke-portrait\",\"videoOptions\":{\"orientation\":\"portrait\"},\"codeVideoIDEProps\":{\"isMouseVisible\":false},\"audioItems\":[],\"actions\":$actions}"
 
       - name: Build and push (linux/amd64 + linux/arm64)
         uses: docker/build-push-action@v6

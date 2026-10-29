@@ -15,6 +15,14 @@ type CodeVideoManifest struct {
 	FontSizePx         int                `json:"fontSizePx,omitempty"`
 	Error              string             `json:"error,omitempty"`
 	CodeVideoIDEProps  *CodeVideoIDEProps `json:"codeVideoIDEProps,omitempty"`
+	VideoOptions       *VideoOptions      `json:"videoOptions,omitempty"`
+}
+
+// VideoOptions are the per-job recording dimensions the API writes from a
+// request's options ("1080p"/"4K", "landscape"/"portrait").
+type VideoOptions struct {
+	Resolution  string `json:"resolution,omitempty"`
+	Orientation string `json:"orientation,omitempty"`
 }
 
 // Configuration holds all CLI configuration
@@ -129,6 +137,7 @@ type CodeVideoIDEProps struct {
 	IsMinimapVisible         *bool              `json:"isMinimapVisible,omitempty"`
 	WordWrap                 *string            `json:"wordWrap,omitempty"`
 	IsTerminalVisible        *bool              `json:"isTerminalVisible,omitempty"`
+	IsMouseVisible           *bool              `json:"isMouseVisible,omitempty"`
 	KeyboardTypingPauseMs    *int               `json:"keyboardTypingPauseMs,omitempty"`
 	IncludeTypos             *bool              `json:"includeTypos,omitempty"`
 	KeyboardTypingJitterMs   *int               `json:"keyboardTypingJitterMs,omitempty"`
