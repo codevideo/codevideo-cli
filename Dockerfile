@@ -2,8 +2,8 @@
 #
 # Build stage compiles the Go CLI with the exact toolchain go.mod pins (1.26) —
 # don't rely on the runtime image's packaged Go, which lags. Runtime stage is
-# zenika/alpine-chrome:with-puppeteer (Chromium + Node + Puppeteer) plus ffmpeg
-# (the webm -> mp4 step shells out to it). Published to Docker Hub as
+# Alpine 3.22 with its packaged Chromium, Node and ffmpeg (the webm -> mp4 step
+# shells out to it). Published to Docker Hub as
 # fullstackcraft/codevideo-cli and pulled by the codevideo-api compose stack.
 
 # ---- build: compile the static Go binary --------------------------------------
@@ -22,12 +22,19 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -ldflags "-X main.version=${VERSION}" -o /out/codevideo
 
 # ---- runtime: Chromium + Node/Puppeteer + ffmpeg ------------------------------
-FROM zenika/alpine-chrome:with-puppeteer AS runtime
+# Alpine 3.22 packages Chromium 142. puppeteer-core 24 installs puppeteer-stream's
+# tab-capture extension through the CDP command Extensions.loadUnpacked, which the
+# former zenika/alpine-chrome base (Alpine 3.19, Chromium 124) lacks: every
+# realtime render failed at browser launch. Fonts match that base, including
+# WenQuanYi Zen Hei for CJK text.
+FROM alpine:3.22 AS runtime
 
-# apk needs root; Chrome runs with --no-sandbox, so root is expected here (see
-# the --no-sandbox note in recordVideoV3.js).
-USER root
-RUN apk add --no-cache ffmpeg
+# Chrome runs with --no-sandbox, so root is expected here (see the --no-sandbox
+# note in recordVideoV3.js).
+RUN apk add --no-cache \
+      chromium chromium-swiftshader nss freetype harfbuzz ca-certificates \
+      fontconfig font-freefont font-opensans font-noto-emoji font-wqy-zenhei \
+      nodejs npm ffmpeg
 
 WORKDIR /app
 

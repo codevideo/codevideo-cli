@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 export const npmRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const repoRoot = path.resolve(npmRoot, "..");
-export const version = "0.0.9";
+export const version = "0.0.10";
 
 export const targets = [
   { platform: "darwin", arch: "arm64", goArch: "arm64", packageDir: "codevideo-cli-darwin-arm64", executable: "codevideo-cli" },
