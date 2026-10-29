@@ -13,7 +13,7 @@ on:
       release_tag:
         description: Existing committed release tag to publish (never a branch)
         required: true
-        default: v0.0.8
+        default: v0.0.9
         type: string
 
 concurrency:

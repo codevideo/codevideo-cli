@@ -154,7 +154,7 @@ port — that shares the API's render queue through a bind mount and reads its s
 
 ```yaml
   codevideo-cli:
-    image: fullstackcraft/codevideo-cli:0.0.8   # pin to a release
+    image: fullstackcraft/codevideo-cli:0.0.9   # pin to a release
     restart: always
     init: true
     shm_size: "1gb"
