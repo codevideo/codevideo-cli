@@ -176,7 +176,7 @@ func processJob(manifestPath string, mode string, outputPath string) error {
 		}
 	} else {
 		// Call the Puppeteer script using node with the uuid and explicit output path.
-		puppeteerFailed := RunPuppeteerForUUID(uuid, mode, manifestPath, webmPath)
+		puppeteerFailed := RunPuppeteerForUUID(uuid, mode, manifestPath, webmPath, jobOrientation(manifest))
 		if puppeteerFailed {
 			log.Printf("Puppeteer recording failed for job %s", uuid)
 			utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
@@ -349,10 +349,26 @@ func updateClerkUserData(environment string, clerkUserId string, manifestPath st
 	return false
 }
 
-func RunPuppeteerForUUID(uuid string, mode string, manifestPath string, webmOutputPath string) bool {
+// jobOrientation prefers the job's own orientation, which the API writes as
+// videoOptions, over the worker-wide default, so one worker renders both
+// landscape and portrait jobs. Resolution stays worker-wide: a 4K job would also
+// need the page's resolution prop, which manifests don't carry yet.
+func jobOrientation(manifest *types.CodeVideoManifest) string {
+	if manifest != nil && manifest.VideoOptions != nil {
+		switch orientation := manifest.VideoOptions.Orientation; orientation {
+		case "landscape", "portrait":
+			return orientation
+		case "":
+		default:
+			log.Printf("Ignoring unknown orientation %q for job %s", orientation, manifest.UUID)
+		}
+	}
+	return config.GlobalConfig.Orientation
+}
+
+func RunPuppeteerForUUID(uuid string, mode string, manifestPath string, webmOutputPath string, orientation string) bool {
 	// Access the global configuration
 	resolution := config.GlobalConfig.Resolution
-	orientation := config.GlobalConfig.Orientation
 
 	nodeScriptPath := constants.PuppeteerRunnerPath()
 

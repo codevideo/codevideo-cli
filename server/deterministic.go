@@ -85,7 +85,7 @@ func processDeterministicJob(manifestPath string, manifest *types.CodeVideoManif
 	stem := strings.TrimSuffix(output, filepath.Ext(output))
 	tracePath, metricsPath := stem+".render-trace.json", stem+".render-metrics.json"
 	silent := filepath.Join(temp, "silent.mp4")
-	args := []string{constants.DeterministicRunnerPath(), "--manifest-path", preparedPath, "--output-mp4", silent, "--trace-path", tracePath, "--metrics-path", metricsPath, "--resolution", config.GlobalConfig.Resolution, "--orientation", config.GlobalConfig.Orientation, "--workers", strconv.Itoa(manifest.RenderWorkers), "--strategy", string(manifest.RenderStrategy)}
+	args := []string{constants.DeterministicRunnerPath(), "--manifest-path", preparedPath, "--output-mp4", silent, "--trace-path", tracePath, "--metrics-path", metricsPath, "--resolution", config.GlobalConfig.Resolution, "--orientation", jobOrientation(manifest), "--workers", strconv.Itoa(manifest.RenderWorkers), "--strategy", string(manifest.RenderStrategy)}
 	if config.GlobalConfig.Debug {
 		args = append(args, "--debug")
 	}

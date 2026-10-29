@@ -9,7 +9,7 @@ import (
 )
 
 func TestLayoutConfigManifestRoundTrip(t *testing.T) {
-	for _, input := range []string{`{"theme":"dark"}`, `{"isFileExplorerVisible":false,"isEditorTabsVisible":false,"isMinimapVisible":false,"wordWrap":"on"}`, `{"isFileExplorerVisible":true,"isEditorTabsVisible":true,"isMinimapVisible":true,"wordWrap":"off"}`} {
+	for _, input := range []string{`{"theme":"dark"}`, `{"isFileExplorerVisible":false,"isEditorTabsVisible":false,"isMinimapVisible":false,"isMouseVisible":false,"wordWrap":"on"}`, `{"isFileExplorerVisible":true,"isEditorTabsVisible":true,"isMinimapVisible":true,"isMouseVisible":true,"wordWrap":"off"}`} {
 		file := filepath.Join(t.TempDir(), "layout.json")
 		if err := os.WriteFile(file, []byte(`{"theme":"dark","defaultLanguage":"python",`+input[1:]), 0600); err != nil {
 			t.Fatal(err)
@@ -32,7 +32,7 @@ func TestLayoutConfigManifestRoundTrip(t *testing.T) {
 		if err := json.Unmarshal([]byte(input), &expected); err != nil {
 			t.Fatal(err)
 		}
-		for _, key := range []string{"isFileExplorerVisible", "isEditorTabsVisible", "isMinimapVisible", "wordWrap"} {
+		for _, key := range []string{"isFileExplorerVisible", "isEditorTabsVisible", "isMinimapVisible", "isMouseVisible", "wordWrap"} {
 			value, exists := got.Props[key]
 			want, wantExists := expected[key]
 			if exists != wantExists || value != want {
