@@ -84,3 +84,8 @@ func MaxConcurrentJobs() int {
 	}
 	return MAX_CONCURRENT_JOBS
 }
+
+// DeterministicRunnerPath follows the configured runtime directory (including npm).
+func DeterministicRunnerPath() string {
+	return filepath.Join(filepath.Dir(PuppeteerRunnerPath()), "renderFramesV1.js")
+}

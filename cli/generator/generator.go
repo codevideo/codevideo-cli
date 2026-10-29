@@ -27,9 +27,13 @@ import (
 
 // Generator handles the creation of CodeVideo manifests
 type Generator struct {
-	Environment string
-	UserID      string
-	IDEProps    *types.CodeVideoIDEProps
+	RenderMode     types.RenderMode
+	RenderSeed     string
+	RenderWorkers  int
+	RenderStrategy types.RenderStrategy
+	Environment    string
+	UserID         string
+	IDEProps       *types.CodeVideoIDEProps
 }
 
 // NewGenerator creates a new manifest generator
@@ -76,6 +80,7 @@ func (g *Generator) GenerateFromActions(actions []types.Action) *types.CodeVideo
 	}
 
 	return &types.CodeVideoManifest{
+		RenderStrategy: g.RenderStrategy, RenderMode: g.RenderMode, RenderSeed: g.RenderSeed, RenderWorkers: g.RenderWorkers,
 		Environment:       g.Environment,
 		UserID:            g.UserID,
 		UUID:              uuid,
@@ -93,6 +98,7 @@ func (g *Generator) GenerateFromLesson(lesson types.Lesson) *types.CodeVideoMani
 	}
 
 	return &types.CodeVideoManifest{
+		RenderStrategy: g.RenderStrategy, RenderMode: g.RenderMode, RenderSeed: g.RenderSeed, RenderWorkers: g.RenderWorkers,
 		Environment:       g.Environment,
 		UserID:            g.UserID,
 		UUID:              uuid.New().String(),
@@ -106,8 +112,12 @@ func (g *Generator) GenerateFromLesson(lesson types.Lesson) *types.CodeVideoMani
 func (g *Generator) GenerateFromCourse(course types.Course) []*types.CodeVideoManifest {
 	var manifests []*types.CodeVideoManifest
 
-	for _, lesson := range course.Lessons {
-		manifests = append(manifests, g.GenerateFromLesson(lesson))
+	for i, lesson := range course.Lessons {
+		manifest := g.GenerateFromLesson(lesson)
+		if g.RenderSeed != "" {
+			manifest.RenderSeed = fmt.Sprintf("%s:lesson:%d:%s", g.RenderSeed, i, lesson.ID)
+		}
+		manifests = append(manifests, manifest)
 	}
 
 	return manifests
@@ -189,8 +199,7 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 				}
 			}
 			audioManifest = append(audioManifest, types.AudioItem{
-				Text:   textToSpeak,
-				Mp3Url: mp3Url,
+				Text: textToSpeak, Mp3Url: mp3Url, ActionIndex: &i,
 			})
 		}
 		// since audio is only about 10% of the total time, we'll cap the max progress at 10%

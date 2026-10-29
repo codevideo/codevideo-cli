@@ -56,6 +56,10 @@ func Execute(cmd *cobra.Command) error {
 	}
 
 	generator := generator.NewGenerator()
+	generator.RenderMode = config.GlobalConfig.RenderMode
+	generator.RenderSeed = config.GlobalConfig.RenderSeed
+	generator.RenderWorkers = config.GlobalConfig.RenderWorkers
+	generator.RenderStrategy = config.GlobalConfig.RenderStrategy
 	if ideProps != nil {
 		generator.IDEProps = ideProps
 	}
@@ -73,7 +77,9 @@ func Execute(cmd *cobra.Command) error {
 			if err != nil {
 				return fmt.Errorf("failed to save manifest: %w", err)
 			}
-			server.ProcessJob(manifestPath, "cli", outputPath)
+			if err := server.ProcessJob(manifestPath, "cli", outputPath); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -86,7 +92,9 @@ func Execute(cmd *cobra.Command) error {
 		if err != nil {
 			return fmt.Errorf("failed to save manifest: %w", err)
 		}
-		server.ProcessJob(manifestPath, "cli", outputPath)
+		if err := server.ProcessJob(manifestPath, "cli", outputPath); err != nil {
+			return err
+		}
 	}
 
 	if actions != nil {
@@ -98,7 +106,9 @@ func Execute(cmd *cobra.Command) error {
 		if err != nil {
 			return fmt.Errorf("failed to save manifest: %w", err)
 		}
-		server.ProcessJob(manifestPath, "cli", outputPath)
+		if err := server.ProcessJob(manifestPath, "cli", outputPath); err != nil {
+			return err
+		}
 	}
 
 	// if the openFile (--open flag) was passed, open it!

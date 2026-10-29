@@ -23,6 +23,7 @@ import (
 	"github.com/codevideo/codevideo-cli/constants"
 	"github.com/codevideo/codevideo-cli/files"
 	"github.com/codevideo/codevideo-cli/mail"
+	"github.com/codevideo/codevideo-cli/types"
 	"github.com/codevideo/codevideo-cli/utils"
 	"github.com/fsnotify/fsnotify"
 
@@ -105,7 +106,7 @@ func WatchForManifestFiles() {
 
 // ProcessJob reads the manifest file, calls the Puppeteer script, sends an email if successful,
 // and moves the manifest to the error or success folder.
-func ProcessJob(manifestPath string, mode string, outputPath string) {
+func ProcessJob(manifestPath string, mode string, outputPath string) error {
 	// still at 10 from the audio generation step
 	if mode == "cli" {
 		renderer.RenderProgressToConsole(10, "Starting up video recording...")
@@ -115,7 +116,7 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 	if err != nil {
 		log.Printf("Failed to unmarshal manifest file: %v", err)
 		utils.AddErrorToManifest(manifestPath, err.Error())
-		return
+		return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
 	}
 	environment := manifest.Environment
 	uuid := manifest.UUID
@@ -125,17 +126,9 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 	if err := os.MkdirAll(videoFolder, 0755); err != nil {
 		log.Printf("Failed to create video folder: %v", err)
 		utils.AddErrorToManifest(manifestPath, err.Error())
-		return
+		return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
 	}
 	webmPath := filepath.Join(videoFolder, uuid+".webm")
-
-	// Call the Puppeteer script using node with the uuid and explicit output path.
-	puppeteerFailed := RunPuppeteerForUUID(uuid, mode, manifestPath, webmPath)
-	if puppeteerFailed {
-		log.Printf("Puppeteer recording failed for job %s", uuid)
-		utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
-		return
-	}
 
 	// Use the provided outputPath if it's not empty, otherwise use the default
 	var mp4Path string
@@ -146,21 +139,42 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 		if err := os.MkdirAll(outputDir, 0755); err != nil {
 			log.Printf("Failed to create output directory: %v", err)
 			utils.AddErrorToManifest(manifestPath, err.Error())
-			return
+			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
 		}
 	} else {
 		mp4Path = filepath.Join(videoFolder, uuid+".mp4")
 	}
 
-	// Puppeteer succeeded, now convert to mp4
-	log.Printf("Converting webm to mp4 for job %s", uuid)
-	if err := utils.ConvertToMp4(webmPath, mp4Path, mode); err != nil {
-		log.Errorf("Failed to convert webm to mp4 for job %s: %v", uuid, err)
-		utils.AddErrorToManifest(manifestPath, fmt.Sprintf("Failed to convert video: %v", err))
-		return
+	renderMode, err := types.ResolveRenderMode(manifest.RenderMode, os.Getenv("CODEVIDEO_RENDER_MODE"))
+	if err != nil {
+		utils.AddErrorToManifest(manifestPath, err.Error())
+		return err
 	}
+	if renderMode == types.RenderModeDeterministic {
+		if err := processDeterministicJob(manifestPath, manifest, mp4Path); err != nil {
+			utils.AddErrorToManifest(manifestPath, err.Error())
+			return err
+		}
+	} else {
+		// Call the Puppeteer script using node with the uuid and explicit output path.
+		puppeteerFailed := RunPuppeteerForUUID(uuid, mode, manifestPath, webmPath)
+		if puppeteerFailed {
+			log.Printf("Puppeteer recording failed for job %s", uuid)
+			utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
+			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
+		}
 
-	log.Printf("Converted webm to mp4 for job %s", uuid)
+		// Puppeteer succeeded, now convert to mp4
+		log.Printf("Converting webm to mp4 for job %s", uuid)
+		if err := utils.ConvertToMp4(webmPath, mp4Path, mode); err != nil {
+			log.Errorf("Failed to convert webm to mp4 for job %s: %v", uuid, err)
+			utils.AddErrorToManifest(manifestPath, fmt.Sprintf("Failed to convert video: %v", err))
+			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
+		}
+
+		log.Printf("Converted webm to mp4 for job %s", uuid)
+
+	}
 
 	// we only need to upload to S3 and update clerk data if we are in serve mode
 	if mode == "serve" {
@@ -169,7 +183,7 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 		if err != nil {
 			log.Printf("Failed to read mp4 file for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, err.Error())
-			return
+			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
 		}
 
 		log.Printf("Uploading mp4 for job %s", uuid)
@@ -177,7 +191,7 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 		if err != nil {
 			log.Printf("Failed to upload file for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, err.Error())
-			return
+			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
 		}
 		log.Printf("Uploaded mp4 for job %s to %s", uuid, mp4Url)
 
@@ -185,7 +199,7 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 		// be sure to initialize the clerk client with the correct API key according to whether the environment of the job is staging or prod
 		shouldReturn := updateClerkUserData(environment, clerkUserId, manifestPath, mp4Url, uuid, base)
 		if shouldReturn {
-			return
+			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
 		}
 	}
 
@@ -218,6 +232,16 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 			// Copy the file to the root directory
 			if err := utils.CopyFile(mp4Path, finalizedFilePath); err != nil {
 				log.Printf("Failed to copy output file: %v", err)
+				return err
+			}
+			if renderMode == types.RenderModeDeterministic {
+				for _, suffix := range []string{".render-trace.json", ".render-metrics.json"} {
+					source := strings.TrimSuffix(mp4Path, filepath.Ext(mp4Path)) + suffix
+					target := strings.TrimSuffix(finalizedFilePath, filepath.Ext(finalizedFilePath)) + suffix
+					if err := utils.CopyFile(source, target); err != nil {
+						return err
+					}
+				}
 			}
 
 			fmt.Println()
@@ -239,9 +263,10 @@ func ProcessJob(manifestPath string, mode string, outputPath string) {
 		}
 	}
 
-	if err := os.Remove(webmPath); err != nil {
+	if err := os.Remove(webmPath); err != nil && !os.IsNotExist(err) {
 		log.Printf("Failed to remove webm file for job %s: %v", uuid, err)
 	}
+	return nil
 }
 
 func updateClerkUserData(environment string, clerkUserId string, manifestPath string, mp4Url string, uuid string, base string) bool {

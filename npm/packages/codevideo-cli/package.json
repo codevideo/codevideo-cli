@@ -30,7 +30,8 @@
   "dependencies": {
     "@puppeteer/browsers": "^2.10.9",
     "puppeteer-stream": "^3.0.22",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.2",
+    "puppeteer-core": "^24.20.0"
   },
   "optionalDependencies": {
     "@fullstackcraftllc/codevideo-cli-darwin-arm64": "0.0.7",

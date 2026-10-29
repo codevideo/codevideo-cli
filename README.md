@@ -2,6 +2,19 @@
 
 The CLI tool for generating CodeVideos.
 
+## Experimental deterministic rendering
+
+Realtime remains the default. To render with virtual time and parallel browsers:
+
+```shell
+./codevideo --project "$(cat actions.json)" --output demo.mp4 \
+  --render-mode deterministic --render-seed demo-v1 --render-workers 4
+```
+
+Workers default to 1 (allowed: 1–32). Speech uses existing audio assets and requires
+ffprobe on PATH or `CODEVIDEO_FFPROBE_PATH`. The output includes trace/metrics JSON
+sidecars. Add `--render-strategy ab-initio` to restore action-boundary checkpoints instead of replaying earlier frames in each worker. Sequential seek remains the deterministic default. See [implementation, local benchmark and release order](docs/deterministic-rendering.md).
+
 ## npm installation
 
 The npm wrapper installs only the native binary for your operating system and architecture:
@@ -201,3 +214,13 @@ git tag -a v0.0.7 -m "Release codevideo-cli 0.0.7"
 git push origin main
 git push origin v0.0.7
 ```
+
+### Portrait editor layout
+
+Use `--orientation portrait --config examples/portrait.config.json` with your
+normal project arguments. The config hides the file explorer, editor tabs (and
+filenames), and minimap, and enables visual word wrap. Each visibility option is
+independent and defaults to `true`; `wordWrap` defaults to `"on"` and also accepts
+`"off"`. Wrapping does not modify the source text. Explicit `false` survives config
+loading; omitted layout fields retain the React defaults. No separate CLI flags
+are needed for these options.

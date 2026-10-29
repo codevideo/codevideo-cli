@@ -101,6 +101,10 @@ func setupLogging(cmd *cobra.Command) {
 }
 
 func init() {
+	rootCmd.Flags().String("render-mode", "realtime", "Render mode (realtime or deterministic)")
+	rootCmd.Flags().String("render-seed", "", "Stable seed for reproducible deterministic renders")
+	rootCmd.Flags().String("render-strategy", "sequential-seek", "Deterministic strategy (sequential-seek or ab-initio)")
+	rootCmd.Flags().Int("render-workers", 1, "Deterministic browser workers (1-32)")
 	// --mode or -m flag for running in server mode
 	rootCmd.Flags().StringP("mode", "m", "", "Run mode (use 'serve' for file watcher mode)")
 

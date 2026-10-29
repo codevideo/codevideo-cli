@@ -2,13 +2,23 @@ name: Docker image
 
 # Build and push the render-worker image to Docker Hub. Runs on the same v* tags
 # as the npm release (kept in a separate workflow so a registry hiccup doesn't
-# block the npm publish, and vice versa). workflow_dispatch builds a branch-tagged
-# image for testing without cutting a release.
+# block the npm publish, and vice versa). Manual runs publish an existing release
+# tag using the current workflow, allowing recovery without moving release tags.
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing committed release tag to publish (never a branch)
+        required: true
+        default: v0.0.8
+        type: string
+
+concurrency:
+  group: docker-image-${{ inputs.release_tag || github.ref_name }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -17,56 +27,120 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-
-      # Gracefully no-op if the Docker Hub creds aren't configured, rather than
-      # failing the run (e.g. on a fork).
       - name: Check Docker Hub credentials
-        id: creds
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] && [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::DOCKERHUB_USERNAME/DOCKERHUB_TOKEN not set — skipping image build/push"
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "::error::Set DOCKERHUB_USERNAME and a write-capable DOCKERHUB_TOKEN in codevideo-cli repository Actions secrets. API repository secrets are separate."
+            exit 1
           fi
 
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Select committed release source
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo '::error::Expected a release tag such as v0.0.8'; exit 1; }
+          git checkout --detach "refs/tags/$RELEASE_TAG"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+
       - name: Docker metadata (tags + version)
-        if: steps.creds.outputs.present == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: fullstackcraft/codevideo-cli
           tags: |
-            type=semver,pattern={{version}}
-            type=ref,event=branch
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ steps.release.outputs.version }}
+          labels: |
+            org.opencontainers.image.revision=${{ steps.release.outputs.revision }}
 
       - name: Set up QEMU (arm64 emulation)
-        if: steps.creds.outputs.present == 'true'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Buildx
-        if: steps.creds.outputs.present == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
-        if: steps.creds.outputs.present == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Refuse to overwrite an existing release image
+        env:
+          IMAGE: fullstackcraft/codevideo-cli:${{ steps.release.outputs.version }}
+        run: |
+          if docker buildx imagetools inspect "$IMAGE" 2>manifest-error.txt; then
+            echo "::error::Release image already exists; verify its source and use it. Never overwrite a release."
+            exit 1
+          fi
+          if ! grep -Eqi 'manifest unknown|no such manifest|not found' manifest-error.txt; then
+            cat manifest-error.txt >&2
+            echo '::error::Cannot establish image absence. Check repository access before publishing.'
+            exit 1
+          fi
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+
+      - name: Build smoke-test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: codevideo-cli:smoke
+          build-args: VERSION=${{ steps.release.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-test worker with an isolated empty queue
+        run: |
+          docker run --rm codevideo-cli:smoke --version
+          trap 'docker logs --tail=60 codevideo-worker-smoke; docker rm -f codevideo-worker-smoke' EXIT
+          docker run -d --name codevideo-worker-smoke --network none -e CODEVIDEO_WORK_DIR=/tmp/smoke-queue codevideo-cli:smoke
+          for attempt in {1..30}; do
+            if docker logs codevideo-worker-smoke 2>&1 | grep -q 'Watching for new manifest files'; then
+              sleep 5
+              test "$(docker inspect -f '{{.State.Running}}' codevideo-worker-smoke)" = true
+              docker exec codevideo-worker-smoke sh -ec 'test -d /tmp/smoke-queue/new && test -w /tmp/smoke-queue/new'
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
       - name: Build and push (linux/amd64 + linux/arm64)
-        if: steps.creds.outputs.present == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            VERSION=${{ steps.meta.outputs.version }}
+            VERSION=${{ steps.release.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify published architectures
+        env:
+          IMAGE: fullstackcraft/codevideo-cli:${{ steps.release.outputs.version }}
+        run: |
+          docker buildx imagetools inspect --raw "$IMAGE" > manifest.json
+          python3 - <<'PYCODE'
+          import json
+          manifest = json.load(open('manifest.json'))
+          platforms = {(m['platform']['os'], m['platform']['architecture']) for m in manifest['manifests']}
+          assert {('linux', 'amd64'), ('linux', 'arm64')} <= platforms, platforms
+          PYCODE

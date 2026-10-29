@@ -1,6 +1,10 @@
 package types
 
 type CodeVideoManifest struct {
+	RenderStrategy     RenderStrategy     `json:"renderStrategy,omitempty"`
+	RenderMode         RenderMode         `json:"renderMode,omitempty"`
+	RenderSeed         string             `json:"renderSeed,omitempty"`
+	RenderWorkers      int                `json:"renderWorkers,omitempty"`
 	Environment        string             `json:"environment"`
 	UserID             string             `json:"userId"`
 	UUID               string             `json:"uuid"`
@@ -34,8 +38,11 @@ func IsValidAction(action Action) bool {
 
 // AudioItem represents an audio item in a CodeVideo project
 type AudioItem struct {
-	Text   string `json:"text"`
-	Mp3Url string `json:"mp3Url"`
+	ActionIndex *int    `json:"actionIndex,omitempty"`
+	AssetID     string  `json:"assetId,omitempty"`
+	DurationMs  float64 `json:"durationMs,omitempty"`
+	Text        string  `json:"text"`
+	Mp3Url      string  `json:"mp3Url"`
 }
 
 // Project is a generic interface for all project types
@@ -118,8 +125,13 @@ type CodeVideoIDEProps struct {
 	FontSizePx               *int               `json:"fontSizePx,omitempty"`
 	IsEmbedMode              *bool              `json:"isEmbedMode,omitempty"`
 	IsFileExplorerVisible    *bool              `json:"isFileExplorerVisible,omitempty"`
+	IsEditorTabsVisible      *bool              `json:"isEditorTabsVisible,omitempty"`
+	IsMinimapVisible         *bool              `json:"isMinimapVisible,omitempty"`
+	WordWrap                 *string            `json:"wordWrap,omitempty"`
 	IsTerminalVisible        *bool              `json:"isTerminalVisible,omitempty"`
 	KeyboardTypingPauseMs    *int               `json:"keyboardTypingPauseMs,omitempty"`
+	IncludeTypos             *bool              `json:"includeTypos,omitempty"`
+	KeyboardTypingJitterMs   *int               `json:"keyboardTypingJitterMs,omitempty"`
 	StandardPauseMs          *int               `json:"standardPauseMs,omitempty"`
 	LongPauseMs              *int               `json:"longPauseMs,omitempty"`
 }

@@ -1,0 +1,9 @@
+{
+  "theme": "dark",
+  "defaultLanguage": "typescript",
+  "withCaptions": true,
+  "isFileExplorerVisible": false,
+  "isEditorTabsVisible": false,
+  "isMinimapVisible": false,
+  "wordWrap": "on"
+}

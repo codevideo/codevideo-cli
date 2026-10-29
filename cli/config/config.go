@@ -15,6 +15,10 @@ import (
 
 // Config holds all configuration settings for the CLI
 type Config struct {
+	RenderMode     types.RenderMode
+	RenderSeed     string
+	RenderWorkers  int
+	RenderStrategy types.RenderStrategy
 	// Project settings
 	ProjectJSON string
 
@@ -47,6 +51,9 @@ func init() {
 // DefaultConfig returns the default configuration
 func DefaultConfig() *Config {
 	return &Config{
+		RenderMode:      types.RenderModeRealtime,
+		RenderStrategy:  types.RenderStrategySequentialSeek,
+		RenderWorkers:   1,
 		OutputDir:       ".",
 		OutputFileName:  fmt.Sprintf("CodeVideo-%s", time.Now().Format("2006-01-02-15-04-05")),
 		OutputFormat:    "mp4",
@@ -60,6 +67,32 @@ func DefaultConfig() *Config {
 
 // LoadFromFlags updates the configuration from command flags
 func LoadFromFlags(cmd *cobra.Command) error {
+	mode, _ := cmd.Flags().GetString("render-mode")
+	if !cmd.Flags().Changed("render-mode") {
+		mode = ""
+	}
+	resolved, err := types.ResolveRenderMode(types.RenderMode(mode), os.Getenv("CODEVIDEO_RENDER_MODE"))
+	if err != nil {
+		return err
+	}
+	GlobalConfig.RenderMode = resolved
+	strategy, _ := cmd.Flags().GetString("render-strategy")
+	GlobalConfig.RenderStrategy, err = types.ResolveRenderStrategy(types.RenderStrategy(strategy))
+	if err != nil {
+		return err
+	}
+	if resolved != types.RenderModeDeterministic && GlobalConfig.RenderStrategy != types.RenderStrategySequentialSeek {
+		return fmt.Errorf("render-strategy ab-initio requires --render-mode deterministic")
+	}
+	GlobalConfig.RenderSeed, _ = cmd.Flags().GetString("render-seed")
+	GlobalConfig.RenderWorkers, _ = cmd.Flags().GetInt("render-workers")
+	if GlobalConfig.RenderWorkers < 1 || GlobalConfig.RenderWorkers > 32 {
+		return fmt.Errorf("render-workers must be between 1 and 32")
+	}
+	if resolved != types.RenderModeDeterministic && GlobalConfig.RenderWorkers != 1 {
+		return fmt.Errorf("render-workers requires --render-mode deterministic")
+	}
+
 	// Read output path if provided
 	output, _ := cmd.Flags().GetString("output")
 	if output != "" {
@@ -165,5 +198,13 @@ func LoadConfigFile(configPath string) (*types.CodeVideoIDEProps, error) {
 		return nil, fmt.Errorf("defaultLanguage is required")
 	}
 
+	// Match the embedded /v3 page's resolved default.
+	base := 40
+	if config.KeyboardTypingPauseMs != nil {
+		base = *config.KeyboardTypingPauseMs
+	}
+	if config.KeyboardTypingJitterMs != nil && (*config.KeyboardTypingJitterMs < 0 || *config.KeyboardTypingJitterMs > base) {
+		return nil, fmt.Errorf("keyboardTypingJitterMs must be a nonnegative integer no greater than keyboardTypingPauseMs (%d)", base)
+	}
 	return &config, nil
 }

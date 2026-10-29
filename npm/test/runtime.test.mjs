@@ -14,6 +14,16 @@ import { installBrowser } from "../packages/codevideo-cli/install-browser.js";
 const require = createRequire(import.meta.url);
 const runtimePaths = require("../../puppeteer-runner/runtimePaths.js");
 
+test("prepared npm runtime includes the deterministic worker, clock and checkpoint partitioner", () => {
+  const renderer = require("../packages/codevideo-cli/runtime/renderFramesV1.js");
+  const segments = require("../packages/codevideo-cli/runtime/renderSegments.js");
+  assert.equal(typeof segments.actionSlicesFor, "function");
+  const clock = require("../packages/codevideo-cli/runtime/virtualClock.js");
+  assert.equal(typeof renderer.render, "function");
+  assert.equal(typeof clock.installVirtualClock, "function");
+  assert.deepEqual(renderer.rangesFor(4, 2), [{ start: 0, end: 2 }, { start: 2, end: 4 }]);
+});
+
 test("maps every supported npm platform package", () => {
   const expected = {
     "darwin-arm64": "@fullstackcraftllc/codevideo-cli-darwin-arm64",

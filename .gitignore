@@ -26,3 +26,10 @@ npm/packages/codevideo-cli-*/bin/codevideo-cli*
 npm/packages/codevideo-cli/runtime/recordVideoV3.js
 npm/packages/codevideo-cli/runtime/runtimePaths.js
 npm/packages/*/LICENSE
+
+npm/packages/codevideo-cli/runtime/renderFramesV1.js
+npm/packages/codevideo-cli/runtime/virtualClock.js
+
+npm/packages/codevideo-cli/runtime/renderSegments.js
+
+/codevideo

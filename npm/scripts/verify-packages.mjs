@@ -49,7 +49,7 @@ for (const target of targets) {
   }
 }
 
-for (const runtimeFile of ["recordVideoV3.js", "runtimePaths.js", "package.json"]) {
+for (const runtimeFile of ["recordVideoV3.js", "runtimePaths.js", "renderFramesV1.js", "virtualClock.js", "renderSegments.js", "package.json"]) {
   if (!fs.statSync(path.join(wrapperDir, "runtime", runtimeFile), { throwIfNoEntry: false })?.isFile()) {
     throw new Error(`Missing wrapper runtime file: ${runtimeFile}`);
   }
