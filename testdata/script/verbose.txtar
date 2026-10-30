@@ -1,0 +1,15 @@
+# -v adds info lines above the progress; --log-level picks any level and
+# overrides -v. The log file gets debug detail either way.
+
+exec codevideo -v -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/v.mp4
+stderr '^Logs saved to: .*codevideo\.log$'
+! stderr '^debug: '
+
+exec codevideo -v --log-level debug -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/d.mp4
+stderr '^debug: \[Puppeteer stdout\]: fake node '
+stderr '^debug: ffmpeg: '
+stderr '^\[100%\] Done · '
+
+! exec codevideo --log-level loud -p '[{"name":"editor-type","value":"let x = 1;"}]'
+stderr '^Error: invalid --log-level "loud": use error, warn, info, debug or trace$'
+! stdout .

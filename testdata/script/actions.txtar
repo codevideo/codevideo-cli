@@ -1,0 +1,20 @@
+# A list of actions renders to one video. The saved file is the only thing on
+# stdout. Status and progress go to stderr, and since stderr isn't a terminal
+# here, progress is a plain line per stage and per 25%. Logs go to the file.
+
+env FAKE_STEP_MS=600
+exec codevideo -p '[{"name":"editor-type","value":"let x = 1;"},{"name":"editor-enter","value":"1"}]' -o $WORK/out/video.mp4
+stdout '^✅ CodeVideo successfully generated and saved to out[/\\]video\.mp4$'
+! stdout 'Detected|%'
+stderr '^Detected project type: Actions$'
+stderr '^/> CodeVideo generation in progress\.\.\.$'
+stderr '^\[ *\d+%\] Starting browser · \d+:\d\d / \d+:\d\d$'
+stderr '^\[ *\d+%\] Recording · action \d/2 · \d+:\d\d / \d+:\d\d$'
+stderr '^\[ *\d+%\] Closing browser · '
+stderr '^\[ *\d+%\] Encoding · '
+stderr '^\[100%\] Done · \d+:\d\d$'
+! stderr 'level=|debug|Puppeteer|warning|error'
+! stderr 'Logs saved to'
+exists $WORK/out/video.mp4
+grep '\[Puppeteer stdout\]: fake node .*recordVideoV3\.js' $WORK/logs/codevideo.log
+grep 'ffmpeg: 2\.0s of 2\.0s encoded' $WORK/logs/codevideo.log

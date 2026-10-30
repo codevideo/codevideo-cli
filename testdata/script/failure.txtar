@@ -1,0 +1,18 @@
+# A failed recording says why on stderr, points at the log and exits 1.
+
+env FAKE_RUNNER=chrome
+! exec codevideo -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/video.mp4
+! stdout .
+stderr '^error: recording failed: exit status 1: CODEVIDEO_CHROME_PATH is not an executable file: /nonexistent/chrome$'
+stderr '^See the log for details: .*codevideo\.log$'
+! exists $WORK/out/video.mp4
+
+# When the runner dies without its own message, the end of its stderr explains.
+env FAKE_RUNNER=crash
+! exec codevideo -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/video.mp4
+stderr '^error: recording failed: exit status 1: TypeError: Cannot read properties of undefined \(reading ''evaluate''\) \| at recordVideoV3 \(recordVideoV3\.js:215:20\)$'
+
+# A project the CLI can't read fails before any rendering.
+env FAKE_RUNNER=
+! exec codevideo -p 'not json'
+stderr '^error: failed to detect project type: '

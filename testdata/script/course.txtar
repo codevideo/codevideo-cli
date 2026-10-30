@@ -1,0 +1,15 @@
+# A course renders a video per lesson: every lesson is narrated first, then
+# each is rendered in turn. Off a terminal, lesson milestones name the lesson.
+
+env FAKE_STEP_MS=300
+exec codevideo -p '{"id":"c1","name":"Tiny course","lessons":[{"id":"l1","name":"Variables","actions":[{"name":"author-speak-before","value":"Variables hold values."},{"name":"editor-type","value":"let count = 1;"}]},{"id":"l2","name":"Printing","actions":[{"name":"author-speak-before","value":"Now print it."},{"name":"editor-type","value":"console.log(count);"}]}]}'
+stdout -count=2 '^✅ CodeVideo successfully generated and saved to out[/\\]CodeVideo-[\d-]+\.mp4$'
+stderr '^Detected project type: Course$'
+stderr '^\[ *\d+%\] Variables · Narration · clip 1/1$'
+stderr '^\[ *\d+%\] Printing · Narration · clip 1/1$'
+stderr '^\[ *\d+%\] Variables · Recording · action \d/2$'
+stderr '^\[ *\d+%\] Printing · Recording · action \d/2$'
+stderr '^\[ *\d+%\] \w[\w ]* · lesson 2/2 · \d+:\d\d / \d+:\d\d$'
+stderr '^\[100%\] Variables · Done$'
+stderr '^\[100%\] Printing · Done$'
+stderr '^\[100%\] Done · \d+:\d\d$'

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,16 +10,19 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/codevideo/codevideo-cli/cli/renderer"
+	"github.com/codevideo/codevideo-cli/cli/progress"
 	log "github.com/sirupsen/logrus"
 )
 
 // ConvertToMp4 converts a given input file to an MP4 file with the specified output filename.
 // It constructs the ffmpeg command with options to overwrite output (-y), use the input (-i),
 // set the video codec, preset, quality level, frame rate, audio codec, and audio bitrate.
-func ConvertToMp4(input, output string, mode string) error {
-	renderer.RenderProgressToConsole(95, "Converting webm to mp4...")
+// Progress goes to the CLI's current job, if there is one.
+func ConvertToMp4(input, output string) error {
+	job := progress.Current()
+	job.Begin(progress.Encoding)
 
 	// Convert input and output to absolute paths if they aren't already
 	inputAbs, err := filepath.Abs(input)
@@ -42,7 +46,7 @@ func ConvertToMp4(input, output string, mode string) error {
 		return fmt.Errorf("failed to create output directory %s: %v", outputDir, err)
 	}
 
-	log.Printf("Converting from %s to %s", inputAbs, outputAbs)
+	log.Debugf("Converting from %s to %s", inputAbs, outputAbs)
 
 	ffmpegPath, err := ResolveFFmpegPath()
 	if err != nil {
@@ -52,6 +56,8 @@ func ConvertToMp4(input, output string, mode string) error {
 	// Construct the ffmpeg command with the -progress flag.
 	cmd := exec.Command(ffmpegPath,
 		"-y",           // Overwrite output if exists
+		"-hide_banner", // No build information on stderr
+		"-nostats",     // Progress comes from -progress, not the stderr stats line
 		"-i", inputAbs, // Input file (absolute path)
 		"-c:v", "libx264", // Video codec
 		"-preset", "fast", // Encoding preset
@@ -63,56 +69,139 @@ func ConvertToMp4(input, output string, mode string) error {
 		outputAbs, // Output file (absolute path)
 	)
 
-	// Log the full command for debugging
-	log.Printf("Executing command: %s", cmd.String())
+	log.Debugf("Executing command: %s", cmd.String())
+
+	// The recording's length. Chrome's webm files have no duration in their
+	// header, so read the last packet timestamp, or else use how long the
+	// recording ran. Only the CLI's progress bar needs it.
+	duration := job.RecordedSeconds()
+	if job != nil {
+		if seconds, err := mediaSeconds(inputAbs); err == nil {
+			duration = seconds
+		} else {
+			log.Debugf("Could not read the recording's length: %v", err)
+		}
+	}
 
 	// Get a pipe to read ffmpeg's stdout.
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("failed to get stdout pipe: %v", err)
 	}
+	// Without -nostats and the banner, stderr only holds stream info and errors.
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 
 	// Start the command.
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start ffmpeg: %v", err)
 	}
 
-	// Create a scanner to read stdout line by line.
+	var block ffmpegProgress
 	scanner := bufio.NewScanner(stdoutPipe)
-	go func() {
-		for scanner.Scan() {
-			line := scanner.Text()
-			// Debug: Uncomment the next line to see raw progress output.
-			log.Println("ffmpeg output:", line)
-
-			// Check if the line contains a progress update.
-			if strings.HasPrefix(line, "progress=") {
-				parts := strings.SplitN(line, "=", 2)
-				if len(parts) == 2 {
-					pStr := strings.TrimSpace(parts[1])
-					// Parse the progress value.
-					if ffmpegProgress, err := strconv.ParseFloat(pStr, 64); err == nil {
-						// Normalize the ffmpeg progress (0-100) to overall progress (80-100).
-						normalizedProgress := 80.0 + (ffmpegProgress/100.0)*20.0
-						// Update the progress bar with the normalized progress.
-						if mode == "cli" {
-							renderer.RenderProgressToConsole(normalizedProgress, "Converting webm to mp4...")
-						}
-					}
-				}
-			}
+	for scanner.Scan() {
+		if !block.read(scanner.Text()) {
+			continue
 		}
-	}()
-
-	// Wait for the command to finish.
-	if err := cmd.Wait(); err != nil {
-		log.Errorf("ffmpeg failed: %v", err)
-		return err
+		fraction, remaining := block.estimate(duration)
+		log.Debugf("ffmpeg: %.1fs of %.1fs encoded at %.2fx", block.outSeconds, duration, block.speed)
+		job.SetFraction(fraction, remaining)
 	}
 
-	renderer.RenderProgressToConsole(100, "")
-
+	// Wait for the command to finish (after stdout is drained).
+	if err := cmd.Wait(); err != nil {
+		log.Debugf("ffmpeg stderr:\n%s", stderr.String())
+		return fmt.Errorf("ffmpeg failed: %v: %s", err, lastLines(stderr.String(), 5))
+	}
+	if stderr.Len() > 0 {
+		log.Debugf("ffmpeg stderr:\n%s", stderr.String())
+	}
 	return nil
+}
+
+// mediaSeconds returns the last video timestamp in a file by listing packet
+// timestamps, which reads the file without decoding it.
+func mediaSeconds(path string) (float64, error) {
+	probe, err := ResolveFFprobePath()
+	if err != nil {
+		return 0, err
+	}
+	output, err := exec.Command(probe, "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time", "-of", "csv=p=0", path).Output()
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe: %w", err)
+	}
+	last := 0.0
+	for _, field := range strings.Fields(string(output)) {
+		if seconds, err := strconv.ParseFloat(strings.TrimSuffix(field, ","), 64); err == nil && seconds > last {
+			last = seconds
+		}
+	}
+	if last <= 0 {
+		return 0, fmt.Errorf("no video timestamps in %s", path)
+	}
+	return last, nil
+}
+
+// ffmpegProgress accumulates `-progress` output. ffmpeg writes key=value lines
+// in blocks, each ending with progress=continue (or progress=end).
+type ffmpegProgress struct {
+	outSeconds float64 // position encoded so far
+	speed      float64 // encoding speed as a multiple of real time
+}
+
+// read applies one line and reports whether it closed a block.
+func (p *ffmpegProgress) read(line string) bool {
+	key, value, ok := strings.Cut(strings.TrimSpace(line), "=")
+	if !ok {
+		return false
+	}
+	switch key {
+	case "out_time_us", "out_time_ms": // both are microseconds (ffmpeg's naming)
+		if us, err := strconv.ParseFloat(value, 64); err == nil && us >= 0 {
+			p.outSeconds = us / 1e6
+		}
+	case "speed":
+		if x, err := strconv.ParseFloat(strings.TrimSuffix(strings.TrimSpace(value), "x"), 64); err == nil && x > 0 {
+			p.speed = x
+		}
+	case "progress":
+		return true
+	}
+	return false
+}
+
+// estimate returns the fraction encoded and the time left for an input of
+// duration seconds; the time left is 0 (unknown) until ffmpeg reports a speed.
+func (p ffmpegProgress) estimate(duration float64) (float64, time.Duration) {
+	if duration <= 0 {
+		return 0, 0
+	}
+	fraction := p.outSeconds / duration
+	if fraction > 1 {
+		fraction = 1
+	}
+	if p.speed <= 0 {
+		return fraction, 0
+	}
+	left := (duration - p.outSeconds) / p.speed
+	if left < 0 {
+		left = 0
+	}
+	return fraction, time.Duration(left * float64(time.Second))
+}
+
+// lastLines returns the final n non-empty lines of s, joined by " | ".
+func lastLines(s string, n int) string {
+	var lines []string
+	for _, line := range strings.Split(s, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return strings.Join(lines, " | ")
 }
 
 // ResolveFFmpegPath resolves the external FFmpeg executable without running it.

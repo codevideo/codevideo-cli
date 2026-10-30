@@ -1,0 +1,20 @@
+# -v and -q contradict each other.
+! exec codevideo -v -q -p '[{"name":"editor-type","value":"let x = 1;"}]'
+stderr 'if any flags in the group \[verbose quiet\] are set none of the others can be'
+
+# --headed shows the browser: the runner gets --debug.
+env CODEVIDEO_LOG_DIR=$WORK/logs-headed
+exec codevideo --headed -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/headed.mp4
+! stderr 'deprecated'
+grep 'fake node .*recordVideoV3\.js .*--debug' $WORK/logs-headed/codevideo.log
+
+# --debug still works, as a deprecated name for --headed.
+env CODEVIDEO_LOG_DIR=$WORK/logs-debug
+exec codevideo --debug -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/debug.mp4
+stderr '^Flag --debug has been deprecated, use --headed instead$'
+grep 'fake node .*recordVideoV3\.js .*--debug' $WORK/logs-debug/codevideo.log
+
+# Headless otherwise.
+env CODEVIDEO_LOG_DIR=$WORK/logs-headless
+exec codevideo -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/headless.mp4
+! grep 'recordVideoV3\.js.* [-]-debug' $WORK/logs-headless/codevideo.log

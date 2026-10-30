@@ -1,0 +1,4 @@
+# Golden files and test scripts are compared byte for byte; keep LF on Windows
+# checkouts too.
+*.golden text eol=lf
+*.txtar text eol=lf

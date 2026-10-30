@@ -8,6 +8,9 @@ const { resolveChromeExecutable } = require('./runtimePaths');
 // define sleep helper function
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 
+// The CLI reads CODEVIDEO_PROGRESS lines for its progress bar and logs the rest.
+const reportProgress = event => console.log("CODEVIDEO_PROGRESS " + JSON.stringify(event));
+
 // Parse command line arguments
 const argv = yargs(hideBin(process.argv))
   .option('uuid', {
@@ -66,6 +69,9 @@ if (!uuid) {
     process.exit(1);
 }
 
+// Module scope so a failed recording can still close the browser.
+let browser;
+
 async function recordVideoV3() {
     console.log("Starting recording for UUID: ", uuid);
     console.log("Debug mode:", debug ? "ENABLED - Browser will be visible" : "disabled");
@@ -78,7 +84,7 @@ async function recordVideoV3() {
 
     console.log("Launching browser with resolution:", width, "x", height, orientation, width === 3840 ? " (4K)" : " (1080p)");
 
-    const browser = await launch({
+    browser = await launch({
         dumpio: true,
         startDelay: 1000,
         executablePath: resolveChromeExecutable(),
@@ -162,6 +168,7 @@ async function recordVideoV3() {
     // When a final progress update is received, we resolve the promise.
     await page.exposeFunction('__onActionProgress', (progress) => {
         console.log("Progress update:", progress);
+        reportProgress({ stage: "recording", action: progress.currentAction });
         // Check if this progress update indicates completion.
         if (progress.progress === "100.0" || progress.currentAction >= progress.totalActions) {
             resolveFinalProgress();
@@ -206,6 +213,7 @@ async function recordVideoV3() {
     });
     stream.pipe(file);
     console.log("Recording started");
+    reportProgress({ stage: "recording" });
 
     // Wait a moment before triggering start.
     await sleep(1000);
@@ -234,12 +242,21 @@ async function recordVideoV3() {
     await stream.destroy();
     file.close();
     console.log("Recording finished");
+    reportProgress({ stage: "closing" });
 
     await browser.close();
     (await wss).close();
 }
 
-recordVideoV3().catch(err => {
+recordVideoV3().catch(async err => {
     console.error("Error during recording:", err);
+    reportProgress({ error: String(err && err.message || err) });
     process.exitCode = 1;
+    // The browser and puppeteer-stream's websocket server would keep Node
+    // running, leaving the CLI (or a worker slot) waiting forever.
+    await Promise.race([
+        Promise.allSettled([browser && browser.close(), wss.then(server => server.close())]),
+        sleep(10000),
+    ]);
+    process.exit(1);
 });

@@ -14,15 +14,14 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/codevideo/codevideo-cli/cli/renderer"
+	"github.com/codevideo/codevideo-cli/cli/notify"
+	"github.com/codevideo/codevideo-cli/cli/progress"
 	"github.com/codevideo/codevideo-cli/cloud"
 	"github.com/codevideo/codevideo-cli/constants"
 	"github.com/codevideo/codevideo-cli/elevenlabs"
 	"github.com/codevideo/codevideo-cli/types"
 	"github.com/codevideo/codevideo-cli/utils"
 	"github.com/google/uuid"
-
-	slack "github.com/codevideo/go-utils/slack"
 )
 
 // Generator handles the creation of CodeVideo manifests
@@ -34,6 +33,8 @@ type Generator struct {
 	Environment    string
 	UserID         string
 	IDEProps       *types.CodeVideoIDEProps
+	// BeforeLesson, if set, runs before each lesson of a course is narrated.
+	BeforeLesson func(index int)
 }
 
 // NewGenerator creates a new manifest generator
@@ -50,33 +51,31 @@ func NewGenerator() *Generator {
 }
 
 // GenerateFromActions creates a manifest from a list of actions
-func (g *Generator) GenerateFromActions(actions []types.Action) *types.CodeVideoManifest {
+func (g *Generator) GenerateFromActions(actions []types.Action) (*types.CodeVideoManifest, error) {
 	// Generate a unique UUID for this manifest
 	uuid := uuid.New().String()
 
-	// Slack log a nice "/> CodeVideo" logo
-	logo := `
+	if notify.Enabled() {
+		// Slack log a nice "/> CodeVideo" logo
+		notify.Send(`
 
 
 />\ CodeVideo CLI
 
 
-`
-	log.Print(logo)
-	slack.SendSlackMessage(logo)
-
-	ramUsage, err := utils.GetRAMUsage()
-	if err != nil {
-		log.Printf("Failed to get RAM usage: %v", err)
+`)
+		ramUsage, err := utils.GetRAMUsage()
+		if err != nil {
+			log.Debugf("Failed to get RAM usage: %v", err)
+		}
+		environmentEnv := strings.ToUpper(os.Getenv("ENVIRONMENT"))
+		notify.Send(fmt.Sprintf("%s: Processing video job: %s (Job has %d actions; RAM usage is at %s)", environmentEnv, uuid, len(actions), ramUsage))
 	}
-	environmentEnv := strings.ToUpper(os.Getenv("ENVIRONMENT"))
-	message := fmt.Sprintf("%s: Processing video job: %s (Job has %d actions; RAM usage is at %s)", environmentEnv, uuid, len(actions), ramUsage)
-	log.Print(message)
-	slack.SendSlackMessage(message)
+	log.Debugf("Processing video job %s with %d actions", uuid, len(actions))
 
 	audioItems, err := generateAudioItems(actions)
 	if err != nil {
-		log.Fatalf("Error generating audio items: %v", err)
+		return nil, fmt.Errorf("error generating audio items: %w", err)
 	}
 
 	return &types.CodeVideoManifest{
@@ -87,14 +86,14 @@ func (g *Generator) GenerateFromActions(actions []types.Action) *types.CodeVideo
 		Actions:           actions,
 		AudioItems:        audioItems,
 		CodeVideoIDEProps: g.IDEProps,
-	}
+	}, nil
 }
 
 // GenerateFromLesson creates a manifest from a lesson
-func (g *Generator) GenerateFromLesson(lesson types.Lesson) *types.CodeVideoManifest {
+func (g *Generator) GenerateFromLesson(lesson types.Lesson) (*types.CodeVideoManifest, error) {
 	audioItems, err := generateAudioItems(lesson.Actions)
 	if err != nil {
-		log.Fatalf("Error generating audio items: %v", err)
+		return nil, fmt.Errorf("error generating audio items: %w", err)
 	}
 
 	return &types.CodeVideoManifest{
@@ -105,22 +104,28 @@ func (g *Generator) GenerateFromLesson(lesson types.Lesson) *types.CodeVideoMani
 		Lesson:            lesson,
 		AudioItems:        audioItems,
 		CodeVideoIDEProps: g.IDEProps,
-	}
+	}, nil
 }
 
 // GenerateFromCourse creates multiple manifests from a course, one for each lesson
-func (g *Generator) GenerateFromCourse(course types.Course) []*types.CodeVideoManifest {
+func (g *Generator) GenerateFromCourse(course types.Course) ([]*types.CodeVideoManifest, error) {
 	var manifests []*types.CodeVideoManifest
 
 	for i, lesson := range course.Lessons {
-		manifest := g.GenerateFromLesson(lesson)
+		if g.BeforeLesson != nil {
+			g.BeforeLesson(i)
+		}
+		manifest, err := g.GenerateFromLesson(lesson)
+		if err != nil {
+			return nil, fmt.Errorf("lesson %d: %w", i+1, err)
+		}
 		if g.RenderSeed != "" {
 			manifest.RenderSeed = fmt.Sprintf("%s:lesson:%d:%s", g.RenderSeed, i, lesson.ID)
 		}
 		manifests = append(manifests, manifest)
 	}
 
-	return manifests
+	return manifests, nil
 }
 
 // SaveManifest saves a manifest to a file in the specified directory
@@ -151,9 +156,15 @@ func (g *Generator) SaveManifest(manifest *types.CodeVideoManifest) (string, err
 
 // generateAudioItems processes the given actions. For each action whose name starts with
 // "author-speak", it converts the text to audio via ElevenLabs and uploads the audio file to S3.
+// Each clip's measured length goes to the CLI's job, which sharpens the recording estimate.
 func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
-	progress := 0.0
-	renderer.RenderProgressToConsole(progress, "Generating audio for speaking actions...")
+	clips := CountSpeech(actions)
+	if clips == 0 {
+		return nil, nil
+	}
+	job := progress.Current()
+	job.PlanNarration(clips)
+	job.Begin(progress.Narration)
 	var audioManifest []types.AudioItem
 
 	// Provider switch: "elevenlabs" (default, cloud + S3) or "kokoro" (self-hosted
@@ -166,12 +177,12 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 	ttsVoiceId := resolveTTSVoiceID()
 	if provider == "elevenlabs" {
 		if ttsVoiceId == "" {
-			log.Printf("No explicit ElevenLabs voice ID found in env; ElevenLabs client default voice will be used")
+			log.Info("No explicit ElevenLabs voice ID found in env; ElevenLabs client default voice will be used")
 		} else {
-			log.Printf("Using ElevenLabs voice ID from environment")
+			log.Debug("Using ElevenLabs voice ID from environment")
 		}
 	} else {
-		log.Printf("Using self-hosted TTS provider %q (audio embedded as data URI, no S3)", provider)
+		log.Infof("Using self-hosted TTS provider %q (audio embedded as data URI, no S3)", provider)
 	}
 
 	for i, action := range actions {
@@ -179,16 +190,18 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 		// Include voice ID in the hash so changing voices always generates new audio objects.
 		textHash := utils.Sha256Hash(fmt.Sprintf("%s::%s", ttsVoiceId, textToSpeak))
 		if strings.HasPrefix(action.Name, "author-speak") {
-			log.Printf("Converting text at step index %d to audio... (hash is %s)\n", i, textHash)
+			log.Debugf("Converting text at step index %d to audio... (hash is %s)", i, textHash)
 			var mp3Url string
+			var audioData []byte
+			var err error
 			if provider == "kokoro" {
-				audioData, err := getAudioFromKokoro(textToSpeak)
+				audioData, err = getAudioFromKokoro(textToSpeak)
 				if err != nil {
 					return nil, fmt.Errorf("error converting text to audio via kokoro: %w", err)
 				}
 				mp3Url = "data:audio/mpeg;base64," + base64.StdEncoding.EncodeToString(audioData)
 			} else {
-				audioData, err := elevenlabs.GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId)
+				audioData, err = elevenlabs.GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId)
 				if err != nil {
 					return nil, fmt.Errorf("error converting text to audio: %w", err)
 				}
@@ -201,16 +214,38 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 			audioManifest = append(audioManifest, types.AudioItem{
 				Text: textToSpeak, Mp3Url: mp3Url, ActionIndex: &i,
 			})
+			job.ClipDone(i, clipDurationMs(job, audioData))
 		}
-		// since audio is only about 10% of the total time, we'll cap the max progress at 10%
-		progress = (float64(i) / float64(len(actions)) * 10)
-		renderer.RenderProgressToConsole(progress, "Generating audio for speaking actions...")
 	}
 
-	log.Printf("Done with audio conversion\n")
-	renderer.RenderProgressToConsole(10, "Done with audio generation")
+	log.Debug("Done with audio conversion")
 
 	return audioManifest, nil
+}
+
+// CountSpeech returns how many actions are narrated.
+func CountSpeech(actions []types.Action) int {
+	count := 0
+	for _, action := range actions {
+		if strings.HasPrefix(action.Name, "author-speak") {
+			count++
+		}
+	}
+	return count
+}
+
+// clipDurationMs measures a narration clip for the progress estimate, or
+// returns 0 when there's no CLI job or ffprobe can't read it.
+func clipDurationMs(job *progress.Job, audio []byte) float64 {
+	if job == nil {
+		return 0
+	}
+	ms, err := utils.AudioDurationMs(context.Background(), audio)
+	if err != nil {
+		log.Debugf("Could not measure narration clip: %v", err)
+		return 0
+	}
+	return ms
 }
 
 // getAudioFromKokoro synthesizes speech via the self-hosted codevideo-tts

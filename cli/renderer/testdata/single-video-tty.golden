@@ -1,0 +1,20 @@
+── 0:00 narration starts ──
+[                          ]   0%  Narration · clip 1/2 · 0:00 / 0:41
+── 0:02 first clip generated ──
+[=                         ]   5%  Narration · clip 2/2 · 0:02 / 0:41
+── 0:04 browser starting ──
+[==                        ]  10%  Starting browser · 0:04 / 0:41
+── 0:16 inside the first action ──
+[==========                ]  40%  Recording · action 1/3 · 0:16 / 0:40
+── 0:19 second action, a little slower than planned ──
+warning: log lines print above the bar
+[===========               ]  44%  Recording · action 2/3 · 0:19 / 0:43
+── 0:25 closing the browser ──
+warning: log lines print above the bar
+[===============           ]  58%  Closing browser · 0:25 / 0:43
+── 0:32 encoding halfway ──
+warning: log lines print above the bar
+[====================      ]  80%  Encoding · 0:32 / 0:40
+── 0:37 saved ──
+warning: log lines print above the bar
+[==========================] 100%  Done · 0:37

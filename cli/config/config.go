@@ -30,7 +30,7 @@ type Config struct {
 	// Processing settings
 	Resolution  string
 	Orientation string
-	Debug       bool // Debug mode flag
+	Headed      bool // Show the browser window instead of running headless
 
 	// Environment
 	OperatingSystem string
@@ -59,7 +59,7 @@ func DefaultConfig() *Config {
 		OutputFormat:    "mp4",
 		Resolution:      "1080p",     // 1080p by default, could be 4K
 		Orientation:     "landscape", // Default to landscape
-		Debug:           false,       // Debug mode disabled by default
+		Headed:          false,       // Headless by default
 		OperatingSystem: runtime.GOOS,
 		Environment:     "local",
 	}
@@ -120,9 +120,10 @@ func LoadFromFlags(cmd *cobra.Command) error {
 		GlobalConfig.ConfigFilePath = configPath
 	}
 
-	// Read debug flag if provided
+	// --debug is the deprecated name of --headed
+	headed, _ := cmd.Flags().GetBool("headed")
 	debug, _ := cmd.Flags().GetBool("debug")
-	GlobalConfig.Debug = debug
+	GlobalConfig.Headed = headed || debug
 
 	// Ensure output directories exist
 	return GlobalConfig.EnsureOutputDirs()

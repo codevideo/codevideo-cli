@@ -1,0 +1,7 @@
+# A webhook in the environment, which a source checkout's .env sets, isn't
+# enough: the CLI posts only when --slack-webhook-url is passed.
+
+env CODEVIDEO_SLACK_WEBHOOK_URL=$SLACK_URL
+exec codevideo -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/video.mp4
+slackposts
+! stdout .

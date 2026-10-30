@@ -147,6 +147,7 @@ async function replay(options, range, outputPath, expected) {
         return { ...window.__codeVideoRenderState, events: window.__drainCodeVideoRenderEvents(), checkpoints: window.__drainCodeVideoRenderCheckpoints?.() };
       }, { timestamp: frame * 1000 / FPS, start: frame === FPS && !options.renderSession?.checkpoint });
       evaluatedFrames++;
+      if (options.progress && !range) options.progress.frame = frame + 1;
       if (options.debugProgress && frame % 300 === 0) console.log(JSON.stringify({frame, action: state.currentActionIndex, complete: state.complete, checkpointCount: checkpoints.length}));
       collect(state);
       if (state.complete && completionMs === null) {
@@ -165,6 +166,7 @@ async function replay(options, range, outputPath, expected) {
           if (options.sampleDir) fs.writeFileSync(path.join(options.sampleDir, `${frame}.jpg`), jpeg);
         }
         captured++;
+        if (options.progress) options.progress.frame++;
       }
     }
     if (partial) {
@@ -224,6 +226,12 @@ async function render(options) {
   if (options.sampleDir) fs.mkdirSync(options.sampleDir, { recursive: true });
   fs.mkdirSync(path.dirname(output), { recursive: true });
   const temp = fs.mkdtempSync(path.join(path.dirname(output), '.codevideo-frames-'));
+  // With reportProgress (--progress), the CLI reads frame counts for its bar.
+  // Planning is reported from its first frame, after the browser has started.
+  const progress = { stage: 'planning', frame: 0 };
+  const reportProgress = () => { if (progress.stage !== 'planning' || progress.frame > 0) console.log('CODEVIDEO_PROGRESS ' + JSON.stringify(progress)); };
+  const ticker = options.reportProgress ? setInterval(reportProgress, 250) : null;
+  if (options.reportProgress) options.progress = progress;
   try {
     console.log(`Deterministic renderer: planning timeline (${options.strategy})${fallback ? ': ' + fallback : ''}`);
     const checkpointDir = path.join(temp, 'checkpoints'); fs.mkdirSync(checkpointDir);
@@ -232,6 +240,7 @@ async function render(options) {
     const plannedAt = performance.now();
     const ranges = options.strategy === 'ab-initio' ? actionSlicesFor(plan, options.workers) : rangesFor(plan.frameCount, options.workers);
     console.log(`Deterministic renderer: capturing ${plan.frameCount} frames with ${ranges.length} worker(s)`);
+    Object.assign(progress, { stage: 'frames', frame: 0, frames: plan.frameCount });
     options.encoderThreads = Math.max(1, Math.min(4, Math.floor(os.availableParallelism() / ranges.length)));
     // Validate all selected checkpoint files before launching any capture workers.
     const sessions = ranges.map(range => options.strategy === 'ab-initio' ? {
@@ -241,6 +250,7 @@ async function render(options) {
     const jobs = ranges.map((range, i) => replay({ ...options, renderSession: sessions[i] }, range, path.join(temp, `${i}.mp4`), plan));
     const results = await Promise.all(jobs.map(job => job.catch(error => { cancel(); throw error; }))).catch(async error => { await Promise.allSettled(jobs); throw error; });
     const capturedAt = performance.now();
+    if (ticker) reportProgress();
     // Relative, generated names avoid quoting user paths in the concat list.
     const listPath = path.join(temp, 'segments.txt');
     fs.writeFileSync(listPath, ranges.map((_, i) => `file '${i}.mp4'`).join('\n'));
@@ -261,7 +271,7 @@ async function render(options) {
     console.error('Render failed before cleanup:', error);
     throw error;
   } finally {
-    clearTimeout(timeout); process.removeListener('SIGTERM', cancel); process.removeListener('SIGINT', cancel);
+    clearTimeout(timeout); clearInterval(ticker); process.removeListener('SIGTERM', cancel); process.removeListener('SIGINT', cancel);
     await Promise.allSettled([...options.browsers].map(browser => browser.close()));
     fs.rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
@@ -272,11 +282,16 @@ if (require.main === module) {
     'trace-path': { type: 'string', demandOption: true }, 'metrics-path': { type: 'string', demandOption: true },
     resolution: { type: 'string', default: '1080p' }, orientation: { type: 'string', default: 'landscape' },
     strategy: { type: 'string', choices: ['sequential-seek', 'ab-initio'] },
-    workers: { type: 'number', default: 1 }, debug: { type: 'boolean', default: false },
+    workers: { type: 'number', default: 1 }, debug: { type: 'boolean', default: false }, progress: { type: 'boolean', default: false },
     'base-url': { type: 'string', default: 'http://localhost:7001' },
   }).parseSync();
   if (!Number.isInteger(argv.workers) || argv.workers < 1 || argv.workers > 32) throw new Error('workers must be an integer from 1 to 32');
   const manifest = JSON.parse(fs.readFileSync(argv.manifestPath, 'utf8'));
-  render({ manifest, strategy: argv.strategy, hashAllFrames: process.env.CODEVIDEO_RENDER_HASH_ALL === '1', output: argv.outputMp4, trace: argv.tracePath, metrics: argv.metricsPath, workers: argv.workers, resolution: argv.resolution, orientation: argv.orientation, debug: argv.debug, baseUrl: argv.baseUrl, sampleDir: process.env.CODEVIDEO_RENDER_SAMPLE_DIR }).catch(error => { console.error(error); process.exitCode = 1; });
+  render({ manifest, strategy: argv.strategy, hashAllFrames: process.env.CODEVIDEO_RENDER_HASH_ALL === '1', output: argv.outputMp4, trace: argv.tracePath, metrics: argv.metricsPath, workers: argv.workers, resolution: argv.resolution, orientation: argv.orientation, debug: argv.debug, reportProgress: argv.progress, baseUrl: argv.baseUrl, sampleDir: process.env.CODEVIDEO_RENDER_SAMPLE_DIR }).catch(error => {
+    console.error(error);
+    // The CLI shows this message when the render fails.
+    if (argv.progress) console.log('CODEVIDEO_PROGRESS ' + JSON.stringify({ error: String(error?.message || error) }));
+    process.exitCode = 1;
+  });
 }
 module.exports = { render, rangesFor, makeTrace, createScene, replay };

@@ -1,0 +1,11 @@
+# --slack-webhook-url posts progress at each stage and every 25%, in order,
+# and every post arrives before the CLI exits.
+
+env FAKE_STEP_MS=600
+exec codevideo --slack-webhook-url $SLACK_URL -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/video.mp4
+slackposts
+stdout 'Processing video job: '
+stdout '^\[ *\d+%\] Starting browser · \d+:\d\d / \d+:\d\d$'
+stdout '^\[ *\d+%\] Recording · action 1/1 · '
+stdout 'Job [\w-]+ processed successfully'
+stdout '^\[100%\] Done · \d+:\d\d$'

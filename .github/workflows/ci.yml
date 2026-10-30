@@ -10,6 +10,65 @@ permissions:
 
 jobs:
   test:
+    name: Tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      # Unit tests, the renderer's golden screens, and the CLI end-to-end
+      # scripts in testdata/script: the real binary against fake runners, its
+      # output checked through a pipe and on a pseudo-terminal (ConPTY on
+      # Windows).
+      - run: go test ./...
+      - name: Puppeteer runner tests
+        working-directory: puppeteer-runner
+        run: |
+          npm ci
+          npm test
+
+  # A real browser on every pull request: the deterministic renderer drives
+  # Chrome for Testing and the CLI muxes its narration with ffmpeg. Realtime
+  # recording runs end to end in the Docker workflow, on main and release tags.
+  browser:
+    name: Browser integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends ffmpeg
+      - name: Install the runner and Chrome for Testing
+        working-directory: puppeteer-runner
+        run: |
+          npm ci
+          # Prints "chrome@<version> <executable path>".
+          installed=$(npx @puppeteer/browsers install chrome@142.0.7415.0 --path "$RUNNER_TEMP/browsers" | tail -n 1)
+          echo "CODEVIDEO_CHROME_PATH=${installed#* }" >> "$GITHUB_ENV"
+      - name: Deterministic render with speech
+        env:
+          CODEVIDEO_BROWSER_TESTS: "1"
+        run: go test ./server -run TestDeterministicSpeechRender -count=1 -v
+
+  npm-package:
+    name: npm packages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -22,7 +81,6 @@ jobs:
           node-version: "24"
           package-manager-cache: false
       - run: npm install --global npm@11.14.1
-      - run: go test ./...
       - working-directory: npm
         run: npm ci --omit=optional
       - working-directory: npm

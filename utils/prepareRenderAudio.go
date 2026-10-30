@@ -51,6 +51,49 @@ func ResolveFFprobePath() (string, error) {
 	}
 	return p, nil
 }
+
+// ProbeDurationMs measures a media file's duration with ffprobe.
+func ProbeDurationMs(ctx context.Context, path string) (float64, error) {
+	probe, err := ResolveFFprobePath()
+	if err != nil {
+		return 0, err
+	}
+	output, err := exec.CommandContext(ctx, probe, "-v", "error", "-show_entries", "format=duration", "-of", "json", path).Output()
+	if err != nil {
+		return 0, fmt.Errorf("ffprobe: %w", err)
+	}
+	var result struct {
+		Format struct {
+			Duration string `json:"duration"`
+		} `json:"format"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return 0, err
+	}
+	seconds, err := strconv.ParseFloat(result.Format.Duration, 64)
+	if err != nil || seconds <= 0 || math.IsNaN(seconds) || math.IsInf(seconds, 0) {
+		return 0, fmt.Errorf("invalid duration %q", result.Format.Duration)
+	}
+	return seconds * 1000, nil
+}
+
+// AudioDurationMs measures encoded audio held in memory.
+func AudioDurationMs(ctx context.Context, data []byte) (float64, error) {
+	file, err := os.CreateTemp("", "codevideo-audio-*")
+	if err != nil {
+		return 0, err
+	}
+	defer os.Remove(file.Name())
+	if _, err := file.Write(data); err != nil {
+		file.Close()
+		return 0, err
+	}
+	if err := file.Close(); err != nil {
+		return 0, err
+	}
+	return ProbeDurationMs(ctx, file.Name())
+}
+
 func readRenderAudio(ctx context.Context, source string) ([]byte, error) {
 	const limit = 64 * 1024 * 1024
 	if strings.HasPrefix(source, "data:") {
@@ -130,27 +173,11 @@ func PrepareRenderAudio(ctx context.Context, manifest *types.CodeVideoManifest, 
 				if err := os.WriteFile(audioPath, data, 0600); err != nil {
 					return nil, err
 				}
-				probe, err := ResolveFFprobePath()
+				durationMs, err := ProbeDurationMs(ctx, audioPath)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("speech action %d: %w", index, err)
 				}
-				output, err := exec.CommandContext(ctx, probe, "-v", "error", "-show_entries", "format=duration", "-of", "json", audioPath).Output()
-				if err != nil {
-					return nil, fmt.Errorf("ffprobe speech action %d: %w", index, err)
-				}
-				var result struct {
-					Format struct {
-						Duration string `json:"duration"`
-					} `json:"format"`
-				}
-				if err := json.Unmarshal(output, &result); err != nil {
-					return nil, err
-				}
-				seconds, err := strconv.ParseFloat(result.Format.Duration, 64)
-				if err != nil || seconds <= 0 || math.IsNaN(seconds) || math.IsInf(seconds, 0) {
-					return nil, fmt.Errorf("invalid speech duration at action %d", index)
-				}
-				assets[assetID] = RenderAudioAsset{Path: audioPath, DurationMs: seconds * 1000}
+				assets[assetID] = RenderAudioAsset{Path: audioPath, DurationMs: durationMs}
 			}
 			sourceIDs[selected.Mp3Url] = assetID
 		}

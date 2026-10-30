@@ -1,0 +1,37 @@
+# On a terminal the bar repaints in place. The final screen holds the status
+# lines, one finished bar per video or lesson, and the saved files. Each
+# fake step outlasts a few repaints, so every stage shows up in screens.txt.
+
+env FAKE_STEP_MS=300
+ttyrun codevideo -p '[{"name":"author-speak-before","value":"Let us declare a variable."},{"name":"editor-type","value":"let x = 1;"}]' -o out/video.mp4
+cmp screen.txt single.golden
+grep 'Narration · clip 1/1 · m:ss / m:ss' screens.txt
+grep 'Starting browser · m:ss / m:ss' screens.txt
+grep 'Recording · action 2/2 · m:ss / m:ss' screens.txt
+grep 'Encoding · m:ss / m:ss' screens.txt
+
+# 100 columns, so the saved files' lines don't wrap.
+ttyrun -width 100 codevideo -p '{"id":"c1","name":"Tiny course","lessons":[{"id":"l1","name":"Variables","actions":[{"name":"editor-type","value":"let count = 1;"}]},{"id":"l2","name":"Printing values to the console","actions":[{"name":"editor-type","value":"console.log(count);"}]}]}'
+cmp screen.txt course.golden
+grep '^  1 Variables      \[=*  *\] *\d+%  Recording · action 1/1$' screens.txt
+grep '^  2 Printing valu… \[ *\]   0%  Waiting$' screens.txt
+
+# A failure on a terminal: the bar stops where it was and the error follows.
+env FAKE_RUNNER=chrome
+! ttyrun -width 120 codevideo -p '[{"name":"editor-type","value":"let x = 1;"}]' -o out/failed.mp4
+grep '^error: recording failed: exit status 1: CODEVIDEO_CHROME_PATH is not an executable file: /nonexistent/chrome$' screen.txt
+! grep '✅' screen.txt
+
+-- single.golden --
+Detected project type: Actions
+/> CodeVideo generation in progress...
+[==========================] 100%  Done · m:ss
+✅ CodeVideo successfully generated and saved to out/video.mp4
+-- course.golden --
+Detected project type: Course
+/> CodeVideo generation in progress...
+[==========================] 100%  Done · m:ss
+  1 Variables      [================] 100%  Done
+  2 Printing valu… [================] 100%  Done
+✅ CodeVideo successfully generated and saved to out/CodeVideo-YYYY-MM-DD-hh-mm-ss.mp4
+✅ CodeVideo successfully generated and saved to out/CodeVideo-YYYY-MM-DD-hh-mm-ss.mp4

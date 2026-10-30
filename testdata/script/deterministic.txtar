@@ -1,0 +1,11 @@
+# A deterministic render reports its planning pass and frame capture.
+
+env FAKE_STEP_MS=600
+exec codevideo --render-mode deterministic -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/video.mp4
+stdout '^✅ CodeVideo successfully generated and saved to out[/\\]video\.mp4$'
+stderr '^\[ *\d+%\] Planning timeline · frame \d+ · \d+:\d\d / \d+:\d\d$'
+stderr '^\[ *\d+%\] Rendering frames · frame \d+/180 · '
+stderr '^\[100%\] Done · '
+exists $WORK/out/video.mp4
+exists $WORK/out/video.render-trace.json
+grep 'fake node .*renderFramesV1\.js .*--progress' $WORK/logs/codevideo.log

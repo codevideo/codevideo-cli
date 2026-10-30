@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/codevideo/codevideo-cli/cli/config"
+	"github.com/codevideo/codevideo-cli/cli/progress"
 	"github.com/codevideo/codevideo-cli/constants"
 	"github.com/codevideo/codevideo-cli/types"
 	"github.com/codevideo/codevideo-cli/utils"
@@ -85,8 +86,8 @@ func processDeterministicJob(manifestPath string, manifest *types.CodeVideoManif
 	stem := strings.TrimSuffix(output, filepath.Ext(output))
 	tracePath, metricsPath := stem+".render-trace.json", stem+".render-metrics.json"
 	silent := filepath.Join(temp, "silent.mp4")
-	args := []string{constants.DeterministicRunnerPath(), "--manifest-path", preparedPath, "--output-mp4", silent, "--trace-path", tracePath, "--metrics-path", metricsPath, "--resolution", config.GlobalConfig.Resolution, "--orientation", jobOrientation(manifest), "--workers", strconv.Itoa(manifest.RenderWorkers), "--strategy", string(manifest.RenderStrategy)}
-	if config.GlobalConfig.Debug {
+	args := []string{constants.DeterministicRunnerPath(), "--manifest-path", preparedPath, "--output-mp4", silent, "--trace-path", tracePath, "--metrics-path", metricsPath, "--resolution", config.GlobalConfig.Resolution, "--orientation", jobOrientation(manifest), "--workers", strconv.Itoa(manifest.RenderWorkers), "--strategy", string(manifest.RenderStrategy), "--progress"}
+	if config.GlobalConfig.Headed {
 		args = append(args, "--debug")
 	}
 	command := exec.CommandContext(ctx, "node", args...)
@@ -98,9 +99,8 @@ func processDeterministicJob(manifestPath string, manifest *types.CodeVideoManif
 		return nil
 	}
 	command.WaitDelay = 10 * time.Second
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	if err := command.Run(); err != nil {
+	job := progress.Current()
+	if err := runRunner(command, "Deterministic renderer", job); err != nil {
 		return fmt.Errorf("deterministic renderer failed: %w", err)
 	}
 	var trace types.RenderTrace
@@ -112,6 +112,7 @@ func processDeterministicJob(manifestPath string, manifest *types.CodeVideoManif
 		return err
 	}
 	muxStarted := time.Now()
+	job.Begin(progress.Encoding)
 	final := filepath.Join(temp, "final.mp4")
 	if err := utils.MuxRenderAudio(ctx, silent, final, trace, assets); err != nil {
 		return err

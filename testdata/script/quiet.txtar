@@ -1,0 +1,5 @@
+# -q leaves stderr empty; the saved video is still reported on stdout.
+
+exec codevideo -q -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/video.mp4
+stdout '^✅ CodeVideo successfully generated and saved to out[/\\]video\.mp4$'
+! stderr .

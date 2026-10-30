@@ -1,0 +1,38 @@
+{
+  "about": "Shared by codevideo-cli (cli/estimate/testdata) and codevideo-types (__tests__/fixtures). Keep both copies identical. expectedMs is each action's playback time: one standard pause plus the action's own time.",
+  "cases": [
+    {
+      "name": "defaults",
+      "options": {},
+      "actions": [
+        { "name": "author-speak-before", "value": "Here is how to log a value in JavaScript." },
+        { "name": "file-explorer-create-file", "value": "index.js" },
+        { "name": "file-explorer-open-file", "value": "index.js" },
+        { "name": "editor-type", "value": "console.log(1 + 1);" },
+        { "name": "editor-enter", "value": "2" },
+        { "name": "author-wait", "value": "1500" },
+        { "name": "mouse-move-editor", "value": "1" },
+        { "name": "author-speak-during", "value": "and type at the same time" },
+        { "name": "terminal-type", "value": "npm install\nnpm test" },
+        { "name": "author-wait", "value": "soon" },
+        { "name": "editor-backspace", "value": "3" },
+        { "name": "editor-scroll-down", "value": "5" }
+      ],
+      "expectedMs": [4600, 1000, 1000, 1950, 1100, 2500, 2300, 1000, 1400, 2000, 1150, 2000]
+    },
+    {
+      "name": "custom pauses and measured narration",
+      "options": { "keyboardTypingPauseMs": 20, "standardPauseMs": 500, "speechMs": { "0": 3200, "2": 1800 } },
+      "actions": [
+        { "name": "author-speak-before", "value": "First clip" },
+        { "name": "editor-type", "value": "ab\ncd" },
+        { "name": "author-speak-after", "value": "Second clip has five words" },
+        { "name": "editor-arrow-down", "value": "0" },
+        { "name": "mouse-left-click", "value": "1" },
+        { "name": "author-speak-before", "value": "No clip measured for this one" },
+        { "name": "editor-type", "value": "héllo 👋" }
+      ],
+      "expectedMs": [3700, 600, 2300, 500, 500, 2900, 660]
+    }
+  ]
+}

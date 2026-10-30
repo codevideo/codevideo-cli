@@ -76,12 +76,20 @@ With actions:
 
 Note: if you are using `zsh` and get the error `zsh: event not found: \`, try deactivating history expansion with `set +o histexpand` and try the command again.
 
+While it renders, one progress bar updates in place with the current stage, the time so far and the estimated total:
+
+```shell
+Detected project type: Actions
+/> CodeVideo generation in progress...
+[==========                ]  38%  Recording · action 4/12 · 0:42 / 1:50
+```
+
 If all works well, you should see the following final output:
 
 ```shell
 Detected project type: Actions
 /> CodeVideo generation in progress...
-[==========================] 100% 
+[==========================] 100%  Done · 1:52
 ✅ CodeVideo successfully generated and saved to CodeVideo-2025-03-21-18-58-47.mp4
 ```
 
@@ -111,9 +119,37 @@ With a course:
 ./codevideo -p "$(cat data/actions.json)" -o codevideo-intro.mp4 --open
 ```
 
+## Output and logging
+
+By default the CLI shows the progress bar, any warnings or errors, and the saved video. Everything else goes to the log file (`codevideo.log` in `CODEVIDEO_LOG_DIR`; next to the binary for source installs), which always records debug detail.
+
+| Flag | Effect |
+| --- | --- |
+| `-v`, `--verbose` | Also show info log lines (config, TTS provider, log file path) above the bar |
+| `--log-level <level>` | Show log lines down to `error`, `warn`, `info`, `debug` or `trace`; overrides `-v` |
+| `-q`, `--quiet` | Hide the bar and status lines; errors and the saved path still print |
+| `--headed` | Show the browser window instead of running it headless (replaces `-d`/`--debug`, which still works with a deprecation notice) |
+| `--slack-webhook-url <url>` | Post progress to a Slack incoming webhook at each stage and every 25% |
+
+The bar, status and log lines go to stderr; the "saved to" line goes to stdout, one per video. When stderr isn't a terminal (CI, pipes, `TERM=dumb`), the bar is replaced by a plain line at each stage and every 25%:
+
+```shell
+[ 52%] Recording · action 1/3 · 0:11 / 0:21
+```
+
+A course shows an overall bar with one bar per lesson below it. Every lesson is narrated first, then each is rendered in turn:
+
+```shell
+[============              ]  48%  Starting browser · lesson 2/2 · 0:23 / 0:47
+  1 Variables      [================] 100%  Done
+  2 Printing valu… [=               ]  12%  Starting browser
+```
+
+The estimate comes from the actions themselves (typing speed, pauses, narration length), using the measured length of each narration clip once it's generated, and is refined from the browser, ffmpeg and frame capture rates as the render runs. In serve mode the worker keeps logging everything to stdout and posting to `CODEVIDEO_SLACK_WEBHOOK_URL`.
+
 ## Video Configuration Options
 
-You can specify the orientation and resolution of the video with the `-r` or `--resolution` and `-o` or `--orientation` flags, respectively. The default resolution is `1080p` and the default orientation is `landscape`.
+You can specify the orientation and resolution of the video with the `-r` or `--resolution` and `-n` or `--orientation` flags, respectively. The default resolution is `1080p` and the default orientation is `landscape`.
 
 ## IDE Configuration Options
 
@@ -190,6 +226,19 @@ docker run --rm \
 You can update the Gatsby static site by replacing the `public` folder within `cli/staticserver`. We recommend you use the `example` site within the `example` folder of the [`@fullstackcraftllc/codevideo-ide-react`](https://github.com/codevideo/codevideo-ide-react) repository.
 
 Everything in the `public` folder is treated as an embedded Go resource and served by the server.
+
+### Tests
+
+| Layer | Covers | Run |
+| --- | --- | --- |
+| Unit | Progress model, estimator, flags and log levels, Slack, runner and ffmpeg output parsing | `go test ./...` |
+| Golden screens | What the renderer draws on a terminal and in plain output (`cli/renderer/testdata`) | `go test ./cli/renderer`, with `-update` to accept new output |
+| CLI end to end | The real binary against fake `node`, `ffmpeg` and `ffprobe`: flags, stdout/stderr, exit codes, Slack posts, and the screen on a pseudo-terminal (ConPTY on Windows). Scripts are in `testdata/script` | `go test -run TestScripts .`, with `-update` to rewrite the golden screens in the scripts |
+| Node runners | A failed recording exits and says why | `cd puppeteer-runner && npm ci && npm test` |
+| Browser | A deterministic render with speech, on real Chrome and ffmpeg | `CODEVIDEO_BROWSER_TESTS=1 go test ./server -run TestDeterministicSpeechRender` |
+| Docker | Serve-mode jobs and CLI renders in the worker image | `.github/workflows/docker-image.yml` |
+
+CI runs the first four on Ubuntu, macOS and Windows for every pull request, the browser test on Ubuntu, and the Docker renders on pushes to main and release tags. The estimator's fixture (`cli/estimate/testdata/estimate-cases.json`) is shared with codevideo-types, whose CI fails if the two copies differ. The end-to-end scripts run one at a time because every CLI run binds port 7001; running them in parallel would need a port override.
 
 ## CodeVideo Studio
 

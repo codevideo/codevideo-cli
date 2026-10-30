@@ -1,0 +1,28 @@
+── 0:02 lesson 1 narrated ──
+[                          ]   3%  Narration · lesson 1/2 · 0:02 / 1:00
+  1 Variables      [=               ]   7%  Narration · clip 1/1
+  2 Printing valu… [                ]   0%  Waiting
+── 0:04 lesson 2 narrated ──
+[=                         ]   7%  Narration · lesson 2/2 · 0:04 / 1:00
+  1 Variables      [=               ]   7%  Waiting
+  2 Printing valu… [=               ]   7%  Narration · clip 1/1
+── 0:16 lesson 1 recording ──
+[=======                   ]  28%  Recording · lesson 1/2 · 0:16 / 0:58
+  1 Variables      [========        ]  51%  Recording · action 1/2
+  2 Printing valu… [=               ]   7%  Waiting
+── 0:24 lesson 1 encoding ──
+[===========               ]  45%  Encoding · lesson 1/2 · 0:24 / 0:54
+  1 Variables      [==============  ]  93%  Encoding
+  2 Printing valu… [=               ]   7%  Waiting
+── 0:38 lesson 2 recording ──
+[===================       ]  74%  Recording · lesson 2/2 · 0:38 / 0:52
+  1 Variables      [================] 100%  Done
+  2 Printing valu… [========        ]  51%  Recording · action 1/2
+── 0:46 lesson 2 encoding ──
+[========================= ]  96%  Encoding · lesson 2/2 · 0:46 / 0:48
+  1 Variables      [================] 100%  Done
+  2 Printing valu… [==============  ]  93%  Encoding
+── 0:48 both lessons saved ──
+[==========================] 100%  Done · 0:48
+  1 Variables      [================] 100%  Done
+  2 Printing valu… [================] 100%  Done

@@ -111,7 +111,7 @@ func (s *Server) StartServer(ctx context.Context) error {
 
 	manifestListener, manifestErr := net.Listen("tcp", s.manifestServer.Addr)
 	if manifestErr != nil {
-		log.Printf(
+		log.Debugf(
 			"Manifest server port %d is unavailable; the Puppeteer runner will load the manifest directly: %v",
 			constants.DEFAULT_MANIFEST_SERVER_PORT,
 			manifestErr,
@@ -124,14 +124,14 @@ func (s *Server) StartServer(ctx context.Context) error {
 	// Start the servers in separate goroutines after both ports are reserved.
 	go func() {
 		if err := s.httpServer.Serve(staticListener); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("HTTP server error: %v\n", err)
+			log.Errorf("HTTP server error: %v", err)
 		}
 	}()
 
 	if s.manifestServer != nil {
 		go func() {
 			if err := s.manifestServer.Serve(manifestListener); err != nil && err != http.ErrServerClosed {
-				fmt.Printf("Manifest server error: %v\n", err)
+				log.Errorf("Manifest server error: %v", err)
 			}
 		}()
 	}
@@ -198,7 +198,7 @@ func (s *Server) waitForServerReady(ctx context.Context) error {
 func getManifestV3Handler(w http.ResponseWriter, r *http.Request) {
 	// Get the UUID from query parameters
 	uuid := r.URL.Query().Get("uuid")
-	log.Println("return manifest for uuid", uuid)
+	log.Debugln("return manifest for uuid", uuid)
 
 	newAbsPath := constants.NewFolder()
 	successAbsPath := constants.SuccessFolder()

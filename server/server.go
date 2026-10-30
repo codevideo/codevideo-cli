@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,7 +17,9 @@ import (
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/clerk/clerk-sdk-go/v2/user"
 	"github.com/codevideo/codevideo-cli/cli/config"
-	"github.com/codevideo/codevideo-cli/cli/renderer"
+	"github.com/codevideo/codevideo-cli/cli/estimate"
+	"github.com/codevideo/codevideo-cli/cli/notify"
+	"github.com/codevideo/codevideo-cli/cli/progress"
 	"github.com/codevideo/codevideo-cli/cloud"
 	"github.com/codevideo/codevideo-cli/constants"
 	"github.com/codevideo/codevideo-cli/files"
@@ -26,8 +27,6 @@ import (
 	"github.com/codevideo/codevideo-cli/types"
 	"github.com/codevideo/codevideo-cli/utils"
 	"github.com/fsnotify/fsnotify"
-
-	slack "github.com/codevideo/go-utils/slack"
 )
 
 var debounceMu sync.Mutex
@@ -105,9 +104,10 @@ func WatchForManifestFiles() {
 }
 
 // ProcessJob reads the manifest file, calls the Puppeteer script, sends an email if successful,
-// and moves the manifest to the error or success folder.
-func ProcessJob(manifestPath string, mode string, outputPath string) error {
-	err := processJob(manifestPath, mode, outputPath)
+// and moves the manifest to the error or success folder. In cli mode it returns the saved
+// video's path, and reports progress to the CLI's current job.
+func ProcessJob(manifestPath string, mode string, outputPath string) (string, error) {
+	saved, err := processJob(manifestPath, mode, outputPath)
 	// A failed serve job used to stay in new/ (the watcher only reacts to new files,
 	// so it was never retried) unless the failure was the email step. Every failure
 	// now records its error in the manifest and lands in error/. Its webm/mp4 stay in
@@ -115,7 +115,7 @@ func ProcessJob(manifestPath string, mode string, outputPath string) error {
 	if err != nil && mode == "serve" {
 		moveManifestToErrorFolder(manifestPath)
 	}
-	return err
+	return saved, err
 }
 
 func moveManifestToErrorFolder(manifestPath string) {
@@ -125,17 +125,14 @@ func moveManifestToErrorFolder(manifestPath string) {
 	}
 }
 
-func processJob(manifestPath string, mode string, outputPath string) error {
-	// still at 10 from the audio generation step
-	if mode == "cli" {
-		renderer.RenderProgressToConsole(10, "Starting up video recording...")
-	}
+func processJob(manifestPath string, mode string, outputPath string) (string, error) {
+	job := progress.Current()
 	base := filepath.Base(manifestPath)
 	manifest, err := files.UnmarshalManifest(manifestPath)
 	if err != nil {
 		log.Printf("Failed to unmarshal manifest file: %v", err)
 		utils.AddErrorToManifest(manifestPath, err.Error())
-		return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
+		return "", fmt.Errorf("reading the job manifest: %w", err)
 	}
 	environment := manifest.Environment
 	uuid := manifest.UUID
@@ -145,7 +142,7 @@ func processJob(manifestPath string, mode string, outputPath string) error {
 	if err := os.MkdirAll(videoFolder, 0755); err != nil {
 		log.Printf("Failed to create video folder: %v", err)
 		utils.AddErrorToManifest(manifestPath, err.Error())
-		return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
+		return "", fmt.Errorf("creating the video folder: %w", err)
 	}
 	webmPath := filepath.Join(videoFolder, uuid+".webm")
 
@@ -158,7 +155,7 @@ func processJob(manifestPath string, mode string, outputPath string) error {
 		if err := os.MkdirAll(outputDir, 0755); err != nil {
 			log.Printf("Failed to create output directory: %v", err)
 			utils.AddErrorToManifest(manifestPath, err.Error())
-			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
+			return "", fmt.Errorf("creating the output folder: %w", err)
 		}
 	} else {
 		mp4Path = filepath.Join(videoFolder, uuid+".mp4")
@@ -167,31 +164,33 @@ func processJob(manifestPath string, mode string, outputPath string) error {
 	renderMode, err := types.ResolveRenderMode(manifest.RenderMode, os.Getenv("CODEVIDEO_RENDER_MODE"))
 	if err != nil {
 		utils.AddErrorToManifest(manifestPath, err.Error())
-		return err
+		return "", err
 	}
+	// Narration is measured by now, so the estimate can use the real clips.
+	PlanProgress(job, manifestActions(manifest), manifest.CodeVideoIDEProps, renderMode, manifest.RenderWorkers)
+	job.Begin(progress.Starting)
 	if renderMode == types.RenderModeDeterministic {
 		if err := processDeterministicJob(manifestPath, manifest, mp4Path); err != nil {
 			utils.AddErrorToManifest(manifestPath, err.Error())
-			return err
+			return "", err
 		}
 	} else {
 		// Call the Puppeteer script using node with the uuid and explicit output path.
-		puppeteerFailed := RunPuppeteerForUUID(uuid, mode, manifestPath, webmPath, jobOrientation(manifest))
-		if puppeteerFailed {
-			log.Printf("Puppeteer recording failed for job %s", uuid)
+		if err := RunPuppeteerForUUID(uuid, manifestPath, webmPath, jobOrientation(manifest)); err != nil {
+			log.Printf("Puppeteer recording failed for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
-			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
+			return "", fmt.Errorf("recording failed: %w", err)
 		}
 
 		// Puppeteer succeeded, now convert to mp4
-		log.Printf("Converting webm to mp4 for job %s", uuid)
-		if err := utils.ConvertToMp4(webmPath, mp4Path, mode); err != nil {
-			log.Errorf("Failed to convert webm to mp4 for job %s: %v", uuid, err)
+		log.Debugf("Converting webm to mp4 for job %s", uuid)
+		if err := utils.ConvertToMp4(webmPath, mp4Path); err != nil {
+			log.Printf("Failed to convert webm to mp4 for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, fmt.Sprintf("Failed to convert video: %v", err))
-			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
+			return "", fmt.Errorf("converting to mp4 failed: %w", err)
 		}
 
-		log.Printf("Converted webm to mp4 for job %s", uuid)
+		log.Debugf("Converted webm to mp4 for job %s", uuid)
 
 	}
 
@@ -202,7 +201,7 @@ func processJob(manifestPath string, mode string, outputPath string) error {
 		if err != nil {
 			log.Printf("Failed to read mp4 file for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, err.Error())
-			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
+			return "", fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
 		}
 
 		log.Printf("Uploading mp4 for job %s", uuid)
@@ -210,7 +209,7 @@ func processJob(manifestPath string, mode string, outputPath string) error {
 		if err != nil {
 			log.Printf("Failed to upload file for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, err.Error())
-			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
+			return "", fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
 		}
 		log.Printf("Uploaded mp4 for job %s to %s", uuid, mp4Url)
 
@@ -218,27 +217,31 @@ func processJob(manifestPath string, mode string, outputPath string) error {
 		// be sure to initialize the clerk client with the correct API key according to whether the environment of the job is staging or prod
 		shouldReturn := updateClerkUserData(environment, clerkUserId, manifestPath, mp4Url, uuid, base)
 		if shouldReturn {
-			return fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
+			return "", fmt.Errorf("job %s failed; see manifest and logs", manifestPath)
 		}
 	}
 
 	// serve or cli mode, move the manifest to the success folder.
 	if err := files.MoveFile(manifestPath, filepath.Join(constants.SuccessFolder(), base)); err != nil {
-		log.Printf("Failed to move manifest to success folder: %v", err)
+		log.Warnf("Failed to move manifest to success folder: %v", err)
 	} else {
-		log.Printf("Job %s processed successfully", uuid)
-		ramUsage, err := utils.GetRAMUsage()
-		if err != nil {
-			log.Printf("Failed to get RAM usage: %v", err)
+		log.Debugf("Job %s processed successfully", uuid)
+		if notify.Enabled() {
+			ramUsage, err := utils.GetRAMUsage()
+			if err != nil {
+				log.Printf("Failed to get RAM usage: %v", err)
+			}
+			environment := os.Getenv("ENVIRONMENT")
+			if environment == "" {
+				environment = "unknown env"
+			}
+			notify.Send(fmt.Sprintf("%s: Job %s processed successfully (RAM usage is at %s)", strings.ToUpper(environment), uuid, ramUsage))
 		}
-		environment := os.Getenv("ENVIRONMENT")
-		if environment == "" {
-			environment = "unknown env"
-		}
-		slack.SendSlackMessage(fmt.Sprintf("%s: Job %s processed successfully (RAM usage is at %s)", strings.ToUpper(environment), uuid, ramUsage))
 	}
 
+	saved := ""
 	if mode == "cli" {
+		saved = outputPath
 		// If outputPath is provided, we've already written to that location
 		// Otherwise, copy the mp4 file to the default location
 		if outputPath == "" {
@@ -248,30 +251,27 @@ func processJob(manifestPath string, mode string, outputPath string) error {
 			finalizedFileName := "CodeVideo-" + formattedTime + ".mp4"
 			finalizedFilePath := filepath.Join(constants.OutputFolder(), finalizedFileName)
 
-			// Copy the file to the root directory
+			// Copy the file to the root directory, which CODEVIDEO_OUTPUT_DIR may
+			// name before it exists
+			if err := os.MkdirAll(constants.OutputFolder(), 0755); err != nil {
+				return "", fmt.Errorf("creating the output folder: %w", err)
+			}
 			if err := utils.CopyFile(mp4Path, finalizedFilePath); err != nil {
 				log.Printf("Failed to copy output file: %v", err)
-				return err
+				return "", err
 			}
 			if renderMode == types.RenderModeDeterministic {
 				for _, suffix := range []string{".render-trace.json", ".render-metrics.json"} {
 					source := strings.TrimSuffix(mp4Path, filepath.Ext(mp4Path)) + suffix
 					target := strings.TrimSuffix(finalizedFilePath, filepath.Ext(finalizedFilePath)) + suffix
 					if err := utils.CopyFile(source, target); err != nil {
-						return err
+						return "", err
 					}
 				}
 			}
-
-			fmt.Println()
-			fmt.Println("✅ CodeVideo successfully generated and saved to " + finalizedFileName)
-			fmt.Println()
-		} else {
-			// Just print that the file was generated in the custom location
-			fmt.Println()
-			fmt.Println("✅ CodeVideo successfully generated and saved to " + outputPath)
-			fmt.Println()
+			saved = finalizedFilePath
 		}
+		// The CLI prints the saved path once the progress bars are gone.
 	}
 
 	// cleanup: remove the mp4 and webm files, decrement 10 tokens from the user
@@ -285,7 +285,8 @@ func processJob(manifestPath string, mode string, outputPath string) error {
 	if err := os.Remove(webmPath); err != nil && !os.IsNotExist(err) {
 		log.Printf("Failed to remove webm file for job %s: %v", uuid, err)
 	}
-	return nil
+	job.Finish(saved)
+	return saved, nil
 }
 
 func updateClerkUserData(environment string, clerkUserId string, manifestPath string, mp4Url string, uuid string, base string) bool {
@@ -366,7 +367,32 @@ func jobOrientation(manifest *types.CodeVideoManifest) string {
 	return config.GlobalConfig.Orientation
 }
 
-func RunPuppeteerForUUID(uuid string, mode string, manifestPath string, webmOutputPath string, orientation string) bool {
+// PlanProgress sets the CLI job's expected stages for rendering actions.
+// Narration measured so far replaces word-count guesses for those actions.
+func PlanProgress(job *progress.Job, actions []types.Action, props *types.CodeVideoIDEProps, mode types.RenderMode, workers int) {
+	if job == nil {
+		return
+	}
+	options := estimate.OptionsFromProps(props)
+	options.SpeechMs = job.SpeechMs()
+	durations := estimate.ActionDurationsMs(actions, options)
+	if mode == types.RenderModeDeterministic {
+		job.PlanDeterministic(durations, workers)
+		return
+	}
+	job.PlanRecording(durations)
+}
+
+func manifestActions(manifest *types.CodeVideoManifest) []types.Action {
+	if len(manifest.Actions) > 0 {
+		return manifest.Actions
+	}
+	return manifest.Lesson.Actions
+}
+
+// RunPuppeteerForUUID records the job's webm. The runner's progress lines go
+// to the CLI's current job and the rest of its output to the debug log.
+func RunPuppeteerForUUID(uuid string, manifestPath string, webmOutputPath string, orientation string) error {
 	// Access the global configuration
 	resolution := config.GlobalConfig.Resolution
 
@@ -374,11 +400,10 @@ func RunPuppeteerForUUID(uuid string, mode string, manifestPath string, webmOutp
 
 	// Check if the script exists
 	if _, err := os.Stat(nodeScriptPath); err != nil {
-		log.Printf("Node script is unavailable at %s: %v", nodeScriptPath, err)
-		return true
+		return fmt.Errorf("node script is unavailable at %s: %w", nodeScriptPath, err)
 	}
 
-	log.Printf("Using node script at: %s", nodeScriptPath)
+	log.Debugf("Using node script at: %s", nodeScriptPath)
 
 	cmd := exec.Command("node", nodeScriptPath,
 		"--uuid", uuid,
@@ -388,75 +413,10 @@ func RunPuppeteerForUUID(uuid string, mode string, manifestPath string, webmOutp
 		"--manifest-path", manifestPath,
 		"--output-webm", webmOutputPath)
 
-	// Add debug flag if enabled
-	if config.GlobalConfig.Debug {
+	// Show the browser window when --headed is set
+	if config.GlobalConfig.Headed {
 		cmd.Args = append(cmd.Args, "--debug")
 	}
 
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Printf("Error obtaining stdout pipe: %v", err)
-		return true
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		log.Printf("Error obtaining stderr pipe: %v", err)
-		return true
-	}
-
-	if err := cmd.Start(); err != nil {
-		log.Printf("Job %s failed to start: %v", uuid, err)
-		return true
-	}
-
-	// Stream stdout concurrently.
-	go func() {
-		scanner := bufio.NewScanner(stdoutPipe)
-		// Allow very long lines: a manifest dump with data-URI audio (or Chrome
-		// dumpio) can exceed bufio's 64KB default. Hitting that limit kills the
-		// scanner, stops draining the pipe, and hangs the child on a full stdout.
-		scanner.Buffer(make([]byte, 1024*1024), 64*1024*1024)
-		for scanner.Scan() {
-			text := scanner.Text()
-			log.Printf("[Puppeteer stdout]: %s", text)
-			if strings.Contains(text, "progress") {
-				// regex everything between ' ' characters
-				progress, err := utils.ExtractProgress(text)
-				if err != nil {
-					log.Printf("Failed to extract progress: %v", err)
-				}
-				log.Printf("Extracted progress: %f", progress)
-
-				// now, since we always are already at 10, we want to show progress even if we are less than 0,
-				// so we scale it in from 10 to 90
-				// (we also have conversion to mp4 still to do)
-				progress = 10 + (progress * 0.8)
-				if mode == "cli" {
-					renderer.RenderProgressToConsole(progress, "Rendering video...")
-				}
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			log.Printf("Error reading stdout: %v", err)
-		}
-	}()
-
-	// Stream stderr concurrently.
-	go func() {
-		scanner := bufio.NewScanner(stderrPipe)
-		scanner.Buffer(make([]byte, 1024*1024), 64*1024*1024)
-		for scanner.Scan() {
-			log.Printf("[Puppeteer stderr]: %s", scanner.Text())
-		}
-		if err := scanner.Err(); err != nil {
-			log.Printf("Error reading stderr: %v", err)
-		}
-	}()
-
-	// Wait for the command to finish.
-	if err := cmd.Wait(); err != nil {
-		log.Printf("Job %s failed: %v", uuid, err)
-		return true
-	}
-	return false
+	return runRunner(cmd, "Puppeteer", progress.Current())
 }
