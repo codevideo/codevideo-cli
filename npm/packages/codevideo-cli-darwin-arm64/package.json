@@ -1,6 +1,6 @@
 {
   "name": "@fullstackcraftllc/codevideo-cli-darwin-arm64",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "CodeVideo CLI native binary for macOS ARM64.",
   "os": ["darwin"],
   "cpu": ["arm64"],
