@@ -21,7 +21,7 @@ test('restored workers match uninterrupted browser frames at selected resumable 
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const temp=process.env.CODEVIDEO_CHECKPOINT_TEST_OUTPUT || fs.mkdtempSync(path.join(os.tmpdir(),'codevideo-checkpoint-browser-'));
   fs.mkdirSync(temp,{recursive:true});
-  const fixtureDir=path.resolve(__dirname,'../../codevideo-ide-react/scripts/golden');
+  const fixtureDir=path.join(__dirname,'fixtures');
   try {
     for(const file of (process.env.CODEVIDEO_CHECKPOINT_TEST_FIXTURES||'fixture-checkpoints.json,fixture-full.json').split(',')) {
       const project=JSON.parse(fs.readFileSync(path.join(fixtureDir,file))), actions=Array.isArray(project)?project:project.actions;

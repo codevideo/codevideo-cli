@@ -66,6 +66,13 @@ jobs:
         env:
           CODEVIDEO_BROWSER_TESTS: "1"
         run: go test ./server -run TestDeterministicSpeechRender -count=1 -v
+      - name: Selection and checkpoint browser tests
+        working-directory: puppeteer-runner
+        env:
+          CODEVIDEO_BROWSER_TESTS: "1"
+          CODEVIDEO_SELECTION_RENDER: "1"
+          CODEVIDEO_CHECKPOINT_TEST_WORKERS: "2"
+        run: npm run test:browser
 
   npm-package:
     name: npm packages

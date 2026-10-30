@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "node --test *.test.js"
+    "test": "node --test *.test.js",
+    "test:browser": "node --test --test-concurrency=1 *.integration.test.js"
   },
   "keywords": [],
   "author": "",
@@ -11,8 +12,12 @@
   "description": "",
   "dependencies": {
     "@puppeteer/browsers": "^2.10.9",
+    "puppeteer-core": "^24.20.0",
     "puppeteer-stream": "^3.0.22",
-    "yargs": "^17.7.2",
-    "puppeteer-core": "^24.20.0"
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@fullstackcraftllc/codevideo-types": "2.6.0",
+    "@fullstackcraftllc/codevideo-virtual-ide": "1.0.43"
   }
 }

@@ -236,9 +236,10 @@ Everything in the `public` folder is treated as an embedded Go resource and serv
 | CLI end to end | The real binary against fake `node`, `ffmpeg` and `ffprobe`: flags, stdout/stderr, exit codes, Slack posts, and the screen on a pseudo-terminal (ConPTY on Windows). Scripts are in `testdata/script` | `go test -run TestScripts .`, with `-update` to rewrite the golden screens in the scripts |
 | Node runners | A failed recording exits and says why | `cd puppeteer-runner && npm ci && npm test` |
 | Browser | A deterministic render with speech, on real Chrome and ffmpeg | `CODEVIDEO_BROWSER_TESTS=1 go test ./server -run TestDeterministicSpeechRender` |
+| Browser selection and checkpoints | Monaco selection and portrait layout in realtime/deterministic replay; uninterrupted and restored-worker render frames | `cd puppeteer-runner && CODEVIDEO_BROWSER_TESTS=1 CODEVIDEO_SELECTION_RENDER=1 CODEVIDEO_CHECKPOINT_TEST_WORKERS=2 npm run test:browser` |
 | Docker | Serve-mode jobs and CLI renders in the worker image | `.github/workflows/docker-image.yml` |
 
-CI runs the first four on Ubuntu, macOS and Windows for every pull request, the browser test on Ubuntu, and the Docker renders on pushes to main and release tags. The estimator's fixture (`cli/estimate/testdata/estimate-cases.json`) is shared with codevideo-types, whose CI fails if the two copies differ. The end-to-end scripts run one at a time because every CLI run binds port 7001; running them in parallel would need a port override.
+CI runs the first four on Ubuntu, macOS and Windows for every pull request, the browser tests on Ubuntu, and the Docker renders on pushes to main and release tags. The JavaScript browser tests use committed fixtures in `puppeteer-runner/fixtures` and a published VirtualIDE dev dependency; no sibling checkout is needed. Install runner dependencies with `npm ci` first, and provide Chrome and FFmpeg (or set `CODEVIDEO_CHROME_PATH` and `CODEVIDEO_FFMPEG_PATH`). Browser test files run sequentially to limit Chrome/encoding resource usage. The estimator's fixture (`cli/estimate/testdata/estimate-cases.json`) is shared with codevideo-types, whose CI fails if the two copies differ. The end-to-end scripts run one at a time because every CLI run binds port 7001; running them in parallel would need a port override.
 
 ## CodeVideo Studio
 

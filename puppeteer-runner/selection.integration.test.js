@@ -4,10 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const os = require('node:os');
-const { pathToFileURL } = require('node:url');
 const { createScene, render } = require('./renderFramesV1');
 
-const lesson = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../codevideo-ide-react/scripts/golden/fixture-selection.json')));
+const lesson = require('./fixtures/fixture-selection.json');
 const portraitProps = {
   theme: 'dark', isFileExplorerVisible: false, isEditorTabsVisible: false,
   isMinimapVisible: false, isTerminalVisible: false, wordWrap: 'on',
@@ -66,7 +65,7 @@ test('real Monaco selection, replay commits, layout options and checkpoint frame
   const host = await serve();
   const output = process.env.CODEVIDEO_SELECTION_TEST_OUTPUT || fs.mkdtempSync(path.join(os.tmpdir(), 'codevideo-selection-'));
   fs.mkdirSync(output, { recursive: true });
-  const { VirtualIDE } = await import(pathToFileURL(path.resolve(__dirname, '../../codevideo-virtual-ide/dist/index.js')));
+  const { VirtualIDE } = await import('@fullstackcraftllc/codevideo-virtual-ide');
   const expected = lesson.actions.map((_, index) => {
     const ide = new VirtualIDE(lesson);
     ide.applyActions(lesson.actions.slice(0, index + 1));
