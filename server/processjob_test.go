@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ func TestServeFailureMovesManifestToErrorFolder(t *testing.T) {
 	t.Setenv("CODEVIDEO_WORK_DIR", work)
 	manifestPath := queueManifest(t, work)
 
-	if _, err := ProcessJob(manifestPath, "serve", ""); err == nil {
+	if _, err := ProcessJob(context.Background(), manifestPath, "serve", ""); err == nil {
 		t.Fatal("expected the job to fail")
 	}
 	if _, err := os.Stat(manifestPath); !os.IsNotExist(err) {
@@ -52,7 +53,7 @@ func TestCLIFailureLeavesManifestInPlace(t *testing.T) {
 	t.Setenv("CODEVIDEO_WORK_DIR", work)
 	manifestPath := queueManifest(t, work)
 
-	if _, err := ProcessJob(manifestPath, "cli", ""); err == nil {
+	if _, err := ProcessJob(context.Background(), manifestPath, "cli", ""); err == nil {
 		t.Fatal("expected the job to fail")
 	}
 	if _, err := os.Stat(manifestPath); err != nil {

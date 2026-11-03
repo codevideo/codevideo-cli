@@ -2,12 +2,14 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -22,6 +24,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ErrCancelled is returned when Ctrl-C or SIGTERM stopped the render.
+var ErrCancelled = errors.New("cancelled")
+
 // Execute runs the CLI workflow with the provided project data. Status lines
 // and progress bars go to stderr; the saved videos are reported on stdout.
 func Execute(cmd *cobra.Command) error {
@@ -30,8 +35,10 @@ func Execute(cmd *cobra.Command) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Get project JSON data from flags
-	projectJSON, _ := cmd.Flags().GetString("project")
+	projectJSON, err := readProject(cmd)
+	if err != nil {
+		return err
+	}
 	if projectJSON == "" {
 		cmd.Help()
 		return nil
@@ -51,9 +58,8 @@ func Execute(cmd *cobra.Command) error {
 		log.Infof("Loaded config from: %s", config.GlobalConfig.ConfigFilePath)
 	}
 
-	// Create a context with cancellation
-	ctx, cancel := context.WithCancel(context.Background())
-	setupCancellation(ctx, cancel)
+	ctx, stop := cancelOnSignal()
+	defer stop()
 
 	log.Debugf("Analyzing project JSON: %s", projectJSON)
 	course, lesson, actions, err := detector.DetectProjectType(projectJSON)
@@ -75,19 +81,28 @@ func Execute(cmd *cobra.Command) error {
 	var saved []string
 	switch {
 	case course != nil:
-		saved, err = renderCourse(generator, *course, outputPath)
+		saved, err = renderCourse(ctx, generator, *course, outputPath)
 	case lesson != nil:
-		saved, err = renderVideo("Lesson", generator, lesson.Actions, func() (*types.CodeVideoManifest, error) {
-			return generator.GenerateFromLesson(*lesson)
+		saved, err = renderVideo(ctx, "Lesson", generator, lesson.Actions, func() (*types.CodeVideoManifest, error) {
+			return generator.GenerateFromLesson(ctx, *lesson)
 		}, outputPath)
 	case actions != nil:
-		saved, err = renderVideo("Actions", generator, *actions, func() (*types.CodeVideoManifest, error) {
-			return generator.GenerateFromActions(*actions)
+		saved, err = renderVideo(ctx, "Actions", generator, *actions, func() (*types.CodeVideoManifest, error) {
+			return generator.GenerateFromActions(ctx, *actions)
 		}, outputPath)
 	}
 	renderer.Stop()
-	for _, path := range saved {
+	for i, path := range saved {
 		fmt.Println("✅ CodeVideo successfully generated and saved to " + displayPath(path))
+		number := 0 // a course's results name their lesson
+		if course != nil {
+			number = i + 1
+		}
+		renderer.Result(path, number)
+	}
+	if err != nil && ctx.Err() != nil {
+		// The runner, ffmpeg or a TTS request failed because the signal stopped it.
+		return ErrCancelled
 	}
 	if err != nil {
 		return err
@@ -106,7 +121,7 @@ func Execute(cmd *cobra.Command) error {
 
 // renderVideo narrates and renders a lesson or a list of actions under one
 // progress bar.
-func renderVideo(kind string, g *generator.Generator, actions []types.Action, generate func() (*types.CodeVideoManifest, error), outputPath string) ([]string, error) {
+func renderVideo(ctx context.Context, kind string, g *generator.Generator, actions []types.Action, generate func() (*types.CodeVideoManifest, error), outputPath string) ([]string, error) {
 	renderer.Status("Detected project type: " + kind)
 	renderer.Status("/> CodeVideo generation in progress...")
 	job := progress.NewJob("")
@@ -118,7 +133,7 @@ func renderVideo(kind string, g *generator.Generator, actions []types.Action, ge
 	if err != nil {
 		return nil, err
 	}
-	saved, err := processManifest(g, manifest, outputPath)
+	saved, err := processManifest(ctx, g, manifest, outputPath)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +142,7 @@ func renderVideo(kind string, g *generator.Generator, actions []types.Action, ge
 
 // renderCourse shows an overall bar with one bar per lesson below it. Every
 // lesson is narrated first, then each one is rendered in turn.
-func renderCourse(g *generator.Generator, course types.Course, outputPath string) ([]string, error) {
+func renderCourse(ctx context.Context, g *generator.Generator, course types.Course, outputPath string) ([]string, error) {
 	renderer.Status("Detected project type: Course")
 	renderer.Status("/> CodeVideo generation in progress...")
 	jobs := make([]*progress.Job, len(course.Lessons))
@@ -142,14 +157,14 @@ func renderCourse(g *generator.Generator, course types.Course, outputPath string
 	renderer.TrackCourse(progress.NewCourse(jobs))
 
 	g.BeforeLesson = func(i int) { progress.SetCurrent(jobs[i]) }
-	manifests, err := g.GenerateFromCourse(course)
+	manifests, err := g.GenerateFromCourse(ctx, course)
 	if err != nil {
 		return nil, err
 	}
 	var saved []string
 	for i, manifest := range manifests {
 		progress.SetCurrent(jobs[i])
-		path, err := processManifest(g, manifest, outputPath)
+		path, err := processManifest(ctx, g, manifest, outputPath)
 		if err != nil {
 			return saved, fmt.Errorf("lesson %d: %w", i+1, err)
 		}
@@ -166,12 +181,31 @@ func planJob(job *progress.Job, g *generator.Generator, actions []types.Action) 
 	server.PlanProgress(job, actions, g.IDEProps, g.RenderMode, g.RenderWorkers)
 }
 
-func processManifest(g *generator.Generator, manifest *types.CodeVideoManifest, outputPath string) (string, error) {
+func processManifest(ctx context.Context, g *generator.Generator, manifest *types.CodeVideoManifest, outputPath string) (string, error) {
 	manifestPath, err := g.SaveManifest(manifest)
 	if err != nil {
 		return "", fmt.Errorf("failed to save manifest: %w", err)
 	}
-	return server.ProcessJob(manifestPath, "cli", outputPath)
+	return server.ProcessJob(ctx, manifestPath, "cli", outputPath)
+}
+
+// readProject returns the project JSON from -p, or from the file that
+// --project-file names. A file has no size limit; one argument does (128 KiB
+// on Linux, and about 32K characters for a whole Windows command line).
+func readProject(cmd *cobra.Command) (string, error) {
+	path, _ := cmd.Flags().GetString("project-file")
+	if path == "" {
+		project, _ := cmd.Flags().GetString("project")
+		return project, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("reading --project-file: %w", err)
+	}
+	if strings.TrimSpace(string(data)) == "" {
+		return "", fmt.Errorf("--project-file %s is empty", path)
+	}
+	return string(data), nil
 }
 
 // displayPath shows a path relative to the working directory when it's inside it.
@@ -184,16 +218,43 @@ func displayPath(path string) string {
 	return path
 }
 
-// setupCancellation clears the progress bars and exits on Ctrl-C. The Node
-// runners and Chrome get the same signal from the terminal.
-func setupCancellation(ctx context.Context, cancel context.CancelFunc) {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+// cancelGrace is how long a cancelled render gets to wind down before the
+// CLI exits anyway. It outlasts utils.StopDelay, after which a runner or
+// ffmpeg that ignored the interrupt has been killed.
+const cancelGrace = utils.StopDelay + 5*time.Second
+
+// cancelOnSignal returns a context that Ctrl-C or SIGTERM cancels, and a
+// function that stops listening. The render's child processes run under the
+// context, so the signal reaches them even when it was sent to the CLI alone:
+// the Node runners close Chrome, and ffmpeg finishes its file. Execute then
+// returns ErrCancelled. A second signal, or a render still running after
+// cancelGrace, exits at once.
+func cancelOnSignal() (context.Context, func()) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signals := make(chan os.Signal, 1)
+	done := make(chan struct{})
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		<-c
-		renderer.Stop()
-		fmt.Fprintln(os.Stderr, "Cancelled")
+		select {
+		case <-signals:
+		case <-done:
+			return
+		}
+		log.Debug("Cancelling the render")
 		cancel()
+		select {
+		case <-signals:
+		case <-time.After(cancelGrace):
+		case <-done:
+			return
+		}
+		renderer.Stop()
+		renderer.Cancelled()
 		os.Exit(130)
 	}()
+	return ctx, func() {
+		signal.Stop(signals)
+		close(done)
+		cancel()
+	}
 }

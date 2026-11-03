@@ -50,8 +50,9 @@ func NewGenerator() *Generator {
 	}
 }
 
-// GenerateFromActions creates a manifest from a list of actions
-func (g *Generator) GenerateFromActions(actions []types.Action) (*types.CodeVideoManifest, error) {
+// GenerateFromActions creates a manifest from a list of actions. Cancelling
+// ctx stops the narration.
+func (g *Generator) GenerateFromActions(ctx context.Context, actions []types.Action) (*types.CodeVideoManifest, error) {
 	// Generate a unique UUID for this manifest
 	uuid := uuid.New().String()
 
@@ -73,7 +74,7 @@ func (g *Generator) GenerateFromActions(actions []types.Action) (*types.CodeVide
 	}
 	log.Debugf("Processing video job %s with %d actions", uuid, len(actions))
 
-	audioItems, err := generateAudioItems(actions)
+	audioItems, err := generateAudioItems(ctx, actions)
 	if err != nil {
 		return nil, fmt.Errorf("error generating audio items: %w", err)
 	}
@@ -90,8 +91,8 @@ func (g *Generator) GenerateFromActions(actions []types.Action) (*types.CodeVide
 }
 
 // GenerateFromLesson creates a manifest from a lesson
-func (g *Generator) GenerateFromLesson(lesson types.Lesson) (*types.CodeVideoManifest, error) {
-	audioItems, err := generateAudioItems(lesson.Actions)
+func (g *Generator) GenerateFromLesson(ctx context.Context, lesson types.Lesson) (*types.CodeVideoManifest, error) {
+	audioItems, err := generateAudioItems(ctx, lesson.Actions)
 	if err != nil {
 		return nil, fmt.Errorf("error generating audio items: %w", err)
 	}
@@ -108,14 +109,14 @@ func (g *Generator) GenerateFromLesson(lesson types.Lesson) (*types.CodeVideoMan
 }
 
 // GenerateFromCourse creates multiple manifests from a course, one for each lesson
-func (g *Generator) GenerateFromCourse(course types.Course) ([]*types.CodeVideoManifest, error) {
+func (g *Generator) GenerateFromCourse(ctx context.Context, course types.Course) ([]*types.CodeVideoManifest, error) {
 	var manifests []*types.CodeVideoManifest
 
 	for i, lesson := range course.Lessons {
 		if g.BeforeLesson != nil {
 			g.BeforeLesson(i)
 		}
-		manifest, err := g.GenerateFromLesson(lesson)
+		manifest, err := g.GenerateFromLesson(ctx, lesson)
 		if err != nil {
 			return nil, fmt.Errorf("lesson %d: %w", i+1, err)
 		}
@@ -157,7 +158,7 @@ func (g *Generator) SaveManifest(manifest *types.CodeVideoManifest) (string, err
 // generateAudioItems processes the given actions. For each action whose name starts with
 // "author-speak", it converts the text to audio via ElevenLabs and uploads the audio file to S3.
 // Each clip's measured length goes to the CLI's job, which sharpens the recording estimate.
-func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
+func generateAudioItems(ctx context.Context, actions []types.Action) ([]types.AudioItem, error) {
 	clips := CountSpeech(actions)
 	if clips == 0 {
 		return nil, nil
@@ -195,17 +196,16 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 			var audioData []byte
 			var err error
 			if provider == "kokoro" {
-				audioData, err = getAudioFromKokoro(textToSpeak)
+				audioData, err = getAudioFromKokoro(ctx, textToSpeak)
 				if err != nil {
 					return nil, fmt.Errorf("error converting text to audio via kokoro: %w", err)
 				}
 				mp3Url = "data:audio/mpeg;base64," + base64.StdEncoding.EncodeToString(audioData)
 			} else {
-				audioData, err = elevenlabs.GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId)
+				audioData, err = elevenlabs.GetAudioArrayBufferElevenLabs(ctx, textToSpeak, ttsApiKey, ttsVoiceId)
 				if err != nil {
 					return nil, fmt.Errorf("error converting text to audio: %w", err)
 				}
-				ctx := context.Background()
 				mp3Url, err = cloud.UploadFileToS3(ctx, audioData, "v3/audio", fmt.Sprintf("%s.mp3", textHash))
 				if err != nil {
 					return nil, fmt.Errorf("error uploading audio to S3: %w", err)
@@ -214,7 +214,7 @@ func generateAudioItems(actions []types.Action) ([]types.AudioItem, error) {
 			audioManifest = append(audioManifest, types.AudioItem{
 				Text: textToSpeak, Mp3Url: mp3Url, ActionIndex: &i,
 			})
-			job.ClipDone(i, clipDurationMs(job, audioData))
+			job.ClipDone(i, clipDurationMs(ctx, job, audioData))
 		}
 	}
 
@@ -236,11 +236,11 @@ func CountSpeech(actions []types.Action) int {
 
 // clipDurationMs measures a narration clip for the progress estimate, or
 // returns 0 when there's no CLI job or ffprobe can't read it.
-func clipDurationMs(job *progress.Job, audio []byte) float64 {
+func clipDurationMs(ctx context.Context, job *progress.Job, audio []byte) float64 {
 	if job == nil {
 		return 0
 	}
-	ms, err := utils.AudioDurationMs(context.Background(), audio)
+	ms, err := utils.AudioDurationMs(ctx, audio)
 	if err != nil {
 		log.Debugf("Could not measure narration clip: %v", err)
 		return 0
@@ -252,7 +252,7 @@ func clipDurationMs(job *progress.Job, audio []byte) float64 {
 // service (OpenAI-compatible POST /v1/audio/speech) and returns mp3 bytes.
 // TTS_SERVICE_URL points at the service (default http://localhost:3000); an
 // optional TTS_API_KEY is sent as a Bearer token.
-func getAudioFromKokoro(text string) ([]byte, error) {
+func getAudioFromKokoro(ctx context.Context, text string) ([]byte, error) {
 	base := strings.TrimRight(os.Getenv("TTS_SERVICE_URL"), "/")
 	if base == "" {
 		base = "http://localhost:3000"
@@ -264,7 +264,7 @@ func getAudioFromKokoro(text string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodPost, base+"/v1/audio/speech", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/v1/audio/speech", bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}

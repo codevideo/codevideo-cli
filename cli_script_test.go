@@ -35,6 +35,7 @@ func TestMain(m *testing.M) {
 		"node":      fakeNode,
 		"ffmpeg":    fakeFFmpeg,
 		"ffprobe":   fakeFFprobe,
+		"chrome":    fakeChrome,
 	})
 }
 
@@ -47,6 +48,9 @@ func TestScripts(t *testing.T) {
 		Cmds: map[string]func(ts *testscript.TestScript, neg bool, args []string){
 			"ttyrun":     ttyrun,
 			"slackposts": slackPosts,
+			"jsonlines":  jsonLines,
+			"sigterm":    sigterm,
+			"gone":       gone,
 		},
 	}
 	if deadline, ok := t.Deadline(); ok {
@@ -119,6 +123,7 @@ func setupScript(env *testscript.Env) error {
 		// Knobs for the fakes; scripts change them with env.
 		{"FAKE_RUNNER", ""},
 		{"FAKE_STEP_MS", "150"},
+		{"FAKE_PID_FILE", filepath.Join(work, "runner.pids")},
 	} {
 		env.Setenv(kv[0], kv[1])
 	}

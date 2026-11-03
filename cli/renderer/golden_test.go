@@ -60,10 +60,10 @@ func (s *scene) show(what string) {
 	s.record(what)
 }
 
-// log prints a line above the bars, as a log line or status line would.
-func (s *scene) log(line string) {
+// log prints a log line above the bars.
+func (s *scene) log(level, message string) {
 	s.ui.mu.Lock()
-	s.ui.println(line)
+	s.ui.log(level, message)
 	s.ui.mu.Unlock()
 }
 
@@ -141,15 +141,16 @@ func golden(t *testing.T, name, got string) {
 	}
 }
 
-// A narrated video from the first clip to the saved file, on a terminal and
-// off one (CI logs, pipes).
+// A narrated video from the first clip to the saved file, on a terminal, off
+// one (CI logs, pipes), and as JSON lines (--progress json).
 func TestGoldenSingleVideo(t *testing.T) {
 	for _, mode := range []struct {
-		name string
-		tty  bool
-	}{{"single-video-tty", true}, {"single-video-plain", false}} {
+		name      string
+		tty, json bool
+	}{{"single-video-tty", true, false}, {"single-video-plain", false, false}, {"single-video-json", false, true}} {
 		t.Run(mode.name, func(t *testing.T) {
 			s := newScene(t, 80, mode.tty)
+			s.ui.json = mode.json
 			job := progress.NewJob("")
 			job.PlanNarration(2)
 			job.PlanRecording([]float64{3200, 1400, 2600})
@@ -170,7 +171,7 @@ func TestGoldenSingleVideo(t *testing.T) {
 			job.ActionStarted(0)
 			s.wait(2 * time.Second)
 			s.show("inside the first action")
-			s.log("warning: log lines print above the bar")
+			s.log("warning", "log lines print above the bar")
 			s.wait(2 * time.Second)
 			job.ActionStarted(1)
 			s.wait(time.Second)
@@ -200,11 +201,12 @@ func TestGoldenSingleVideo(t *testing.T) {
 // first, then rendered one after the other.
 func TestGoldenCourse(t *testing.T) {
 	for _, mode := range []struct {
-		name string
-		tty  bool
-	}{{"course-tty", true}, {"course-plain", false}} {
+		name      string
+		tty, json bool
+	}{{"course-tty", true, false}, {"course-plain", false, false}, {"course-json", false, true}} {
 		t.Run(mode.name, func(t *testing.T) {
 			s := newScene(t, 80, mode.tty)
+			s.ui.json = mode.json
 			lessons := []*progress.Job{progress.NewJob("Variables"), progress.NewJob("Printing values to the console")}
 			for _, lesson := range lessons {
 				lesson.PlanNarration(1)
@@ -291,7 +293,7 @@ func TestGoldenNarrowTerminal(t *testing.T) {
 	lessons[0].ActionStarted(0)
 	s.wait(time.Second)
 	s.show("50 columns")
-	s.log("a log line longer than the terminal is wide wraps instead of being cut, since only the bars are repainted")
+	s.log("info", "a log line longer than the terminal is wide wraps instead of being cut, since only the bars are repainted")
 	s.wait(time.Second)
 	s.show("after a long log line")
 	golden(t, "narrow-tty", s.trace.String())

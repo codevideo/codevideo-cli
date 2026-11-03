@@ -1,0 +1,33 @@
+# --project-file reads the project from a file: a lesson with its snapshots
+# can outgrow one argument (128 KiB on Linux, a 32K-character command line
+# on Windows), but not a file.
+exec codevideo --project-file lesson.json -o $WORK/out/video.mp4
+stdout '^✅ CodeVideo successfully generated and saved to out[/\\]video\.mp4$'
+stderr '^Detected project type: Lesson$'
+stderr '^\[100%\] Done · '
+
+# It takes the place of -p, so the two can't be combined.
+! exec codevideo -p '[{"name":"editor-type","value":"let x = 1;"}]' --project-file lesson.json
+stderr 'if any flags in the group \[project project-file\] are set none of the others can be'
+! stdout .
+
+# A file that can't be read, or holds nothing, fails before any rendering.
+! exec codevideo --project-file missing.json
+stderr '^error: reading --project-file: open missing\.json: '
+stderr '^See the log for details: .*codevideo\.log$'
+! stdout .
+! exec codevideo --project-file empty.json
+stderr '^error: --project-file empty\.json is empty$'
+! stderr 'Detected'
+
+-- lesson.json --
+{
+  "id": "l1",
+  "name": "Variables",
+  "actions": [
+    { "name": "editor-type", "value": "let count = 1;" },
+    { "name": "editor-enter", "value": "1" }
+  ]
+}
+-- empty.json --
+

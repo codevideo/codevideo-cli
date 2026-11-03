@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -19,8 +20,9 @@ import (
 // ConvertToMp4 converts a given input file to an MP4 file with the specified output filename.
 // It constructs the ffmpeg command with options to overwrite output (-y), use the input (-i),
 // set the video codec, preset, quality level, frame rate, audio codec, and audio bitrate.
-// Progress goes to the CLI's current job, if there is one.
-func ConvertToMp4(input, output string) error {
+// Progress goes to the CLI's current job, if there is one. Cancelling ctx
+// interrupts ffmpeg.
+func ConvertToMp4(ctx context.Context, input, output string) error {
 	job := progress.Current()
 	job.Begin(progress.Encoding)
 
@@ -54,7 +56,7 @@ func ConvertToMp4(input, output string) error {
 	}
 
 	// Construct the ffmpeg command with the -progress flag.
-	cmd := exec.Command(ffmpegPath,
+	cmd := CommandContext(ctx, ffmpegPath,
 		"-y",           // Overwrite output if exists
 		"-hide_banner", // No build information on stderr
 		"-nostats",     // Progress comes from -progress, not the stderr stats line
@@ -76,7 +78,7 @@ func ConvertToMp4(input, output string) error {
 	// recording ran. Only the CLI's progress bar needs it.
 	duration := job.RecordedSeconds()
 	if job != nil {
-		if seconds, err := mediaSeconds(inputAbs); err == nil {
+		if seconds, err := mediaSeconds(ctx, inputAbs); err == nil {
 			duration = seconds
 		} else {
 			log.Debugf("Could not read the recording's length: %v", err)
@@ -121,12 +123,12 @@ func ConvertToMp4(input, output string) error {
 
 // mediaSeconds returns the last video timestamp in a file by listing packet
 // timestamps, which reads the file without decoding it.
-func mediaSeconds(path string) (float64, error) {
+func mediaSeconds(ctx context.Context, path string) (float64, error) {
 	probe, err := ResolveFFprobePath()
 	if err != nil {
 		return 0, err
 	}
-	output, err := exec.Command(probe, "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time", "-of", "csv=p=0", path).Output()
+	output, err := exec.CommandContext(ctx, probe, "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time", "-of", "csv=p=0", path).Output()
 	if err != nil {
 		return 0, fmt.Errorf("ffprobe: %w", err)
 	}

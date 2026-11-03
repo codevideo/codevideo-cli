@@ -1,0 +1,22 @@
+── 0:02 lesson 1 narrated ──
+{"stage":"Narration","fraction":0.067,"elapsed":2,"total":30,"detail":"clip 1/1","lesson":1}
+{"stage":"Narration","fraction":0.033,"elapsed":2,"total":60,"detail":"lesson 1/2"}
+── 0:04 lesson 2 narrated ──
+{"stage":"Narration","fraction":0.067,"elapsed":2,"total":30,"detail":"clip 1/1","lesson":2}
+{"stage":"Narration","fraction":0.067,"elapsed":4,"total":60,"detail":"lesson 2/2"}
+── 0:16 lesson 1 recording ──
+{"stage":"Recording","fraction":0.509,"elapsed":16,"total":29.5,"detail":"action 1/2","lesson":1}
+{"stage":"Recording","fraction":0.278,"elapsed":16,"total":57.5,"detail":"lesson 1/2"}
+── 0:24 lesson 1 encoding ──
+{"stage":"Encoding","fraction":0.929,"elapsed":24,"total":25.8,"detail":"","lesson":1}
+{"stage":"Encoding","fraction":0.446,"elapsed":24,"total":53.8,"detail":"lesson 1/2"}
+── 0:38 lesson 2 recording ──
+{"stage":"Done","fraction":1,"elapsed":38,"total":38,"detail":"","lesson":1}
+{"stage":"Recording","fraction":0.509,"elapsed":36,"total":49.5,"detail":"action 1/2","lesson":2}
+{"stage":"Recording","fraction":0.738,"elapsed":38,"total":51.5,"detail":"lesson 2/2"}
+── 0:46 lesson 2 encoding ──
+{"stage":"Encoding","fraction":0.929,"elapsed":44,"total":45.8,"detail":"","lesson":2}
+{"stage":"Encoding","fraction":0.962,"elapsed":46,"total":47.8,"detail":"lesson 2/2"}
+── 0:48 both lessons saved ──
+{"stage":"Done","fraction":1,"elapsed":46,"total":46,"detail":"","lesson":2}
+{"stage":"Done","fraction":1,"elapsed":48,"total":48,"detail":""}

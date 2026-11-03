@@ -1,0 +1,44 @@
+# --progress json makes stderr one JSON object per line: progress at each
+# stage and every 25%, and at least once a second, then a result line per
+# saved video. stdout keeps its "saved to" lines. jsonlines checks every line
+# and prints the stages in order and the lines that end the output.
+
+env FAKE_STEP_MS=600
+exec codevideo --progress json -p '[{"name":"editor-type","value":"let x = 1;"},{"name":"editor-enter","value":"1"}]' -o $WORK/out/video.mp4
+stdout '^✅ CodeVideo successfully generated and saved to out[/\\]video\.mp4$'
+! stderr 'Detected project type'
+jsonlines
+cmp stdout actions.golden
+
+# --progress=json works too. A course has a line for itself and one for each
+# lesson, which carries the lesson's number, as its result line does.
+env FAKE_STEP_MS=300
+exec codevideo --progress=json -p '{"id":"c1","name":"Tiny course","lessons":[{"id":"l1","name":"Variables","actions":[{"name":"author-speak-before","value":"Variables hold values."},{"name":"editor-type","value":"let count = 1;"}]},{"id":"l2","name":"Printing","actions":[{"name":"author-speak-before","value":"Now print it."},{"name":"editor-type","value":"console.log(count);"}]}]}'
+stdout -count=2 '^✅ CodeVideo successfully generated and saved to out[/\\]CodeVideo-[\d-]+\.mp4$'
+jsonlines
+stdout '^stages: Narration, Starting browser, .*, Encoding, Done$'
+stdout '^lesson 1: Narration, Starting browser, Recording, Closing browser, Encoding, Done$'
+stdout '^lesson 2: Narration, Starting browser, Recording, Closing browser, Encoding, Done$'
+stdout '^result \(lesson 1\): out/CodeVideo-YYYY-MM-DD-hh-mm-ss\.mp4\nresult \(lesson 2\): out/CodeVideo-YYYY-MM-DD-hh-mm-ss\.mp4\n\z'
+
+# A failure ends with an error line that names the log.
+env FAKE_RUNNER=chrome
+! exec codevideo --progress json -p '[{"name":"editor-type","value":"let x = 1;"}]' -o $WORK/out/failed.mp4
+! stdout .
+jsonlines
+cmp stdout failure.golden
+
+# On a terminal it's JSON all the same: no bar.
+env FAKE_RUNNER=
+ttyrun -width 200 codevideo --progress json -p '[{"name":"editor-type","value":"let x = 1;"}]' -o out/tty.mp4
+grep '^\{"stage":"Done","fraction":1,' screen.txt
+grep '^\{"result":".*tty\.mp4"\}$' screen.txt
+! grep '\[=' screens.txt
+
+-- actions.golden --
+stages: Starting browser, Recording, Closing browser, Encoding, Done
+result: out/video.mp4
+-- failure.golden --
+stages: Starting browser
+error: recording failed: exit status 1: CODEVIDEO_CHROME_PATH is not an executable file: /nonexistent/chrome
+log: logs/codevideo.log

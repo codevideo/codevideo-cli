@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/codevideo/codevideo-cli/cli/config"
+	"github.com/codevideo/codevideo-cli/cli/renderer"
 )
 
 // command parses args against the real flag set without running anything.
@@ -82,23 +83,40 @@ func TestDebugFlagIsADeprecatedHeaded(t *testing.T) {
 	}
 }
 
-func TestConsoleLine(t *testing.T) {
-	for _, tt := range []struct {
-		level   log.Level
-		message string
-		want    string
-	}{
-		{log.InfoLevel, "Loaded config from: portrait.json\n", "Loaded config from: portrait.json"},
-		{log.WarnLevel, "Failed to move manifest", "warning: Failed to move manifest"},
-		{log.ErrorLevel, "job failed", "error: job failed"},
-		{log.DebugLevel, "ffmpeg: 1.0s", "debug: ffmpeg: 1.0s"},
-	} {
-		if got := consoleLine(tt.level, tt.message); got != tt.want {
-			t.Errorf("consoleLine(%v, %q) = %q, want %q", tt.level, tt.message, got, tt.want)
-		}
-	}
+func TestConsoleHookLevels(t *testing.T) {
 	hook := &consoleHook{level: log.WarnLevel}
 	if got := hook.Levels(); len(got) != 4 || got[3] != log.WarnLevel {
 		t.Errorf("warn hook levels = %v", got)
+	}
+}
+
+func TestProjectAndProjectFileConflict(t *testing.T) {
+	_, _, err := command(t, "-p", `[{"name":"editor-type","value":"x"}]`, "--project-file", "lesson.json")
+	if err == nil || !strings.Contains(err.Error(), "[project project-file]") {
+		t.Fatalf("-p with --project-file: %v", err)
+	}
+}
+
+func TestProgressFormat(t *testing.T) {
+	for _, tt := range []struct {
+		args []string
+		want renderer.Format
+	}{
+		{nil, renderer.Human},
+		{[]string{"--progress", "human"}, renderer.Human},
+		{[]string{"--progress", "json"}, renderer.JSON},
+		{[]string{"--progress=json"}, renderer.JSON},
+	} {
+		cmd, _, err := command(t, tt.args...)
+		if err != nil {
+			t.Fatalf("%v: %v", tt.args, err)
+		}
+		if got, err := progressFormat(cmd); err != nil || got != tt.want {
+			t.Errorf("progressFormat(%v) = %q, %v; want %q", tt.args, got, err, tt.want)
+		}
+	}
+	cmd, _, _ := command(t, "--progress", "xml")
+	if _, err := progressFormat(cmd); err == nil || !strings.Contains(err.Error(), `"xml"`) {
+		t.Errorf("--progress xml: %v", err)
 	}
 }

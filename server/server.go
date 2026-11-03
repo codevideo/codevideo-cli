@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -84,7 +83,7 @@ func WatchForManifestFiles() {
 							defer func() { <-semaphore }()
 							// Optional delay to ensure the file is fully written.
 							time.Sleep(2 * time.Second)
-							ProcessJob(filePath, "serve", "")
+							ProcessJob(context.Background(), filePath, "serve", "")
 						}(event.Name)
 						// Clean up the timer from the map.
 						debounceMu.Lock()
@@ -105,9 +104,10 @@ func WatchForManifestFiles() {
 
 // ProcessJob reads the manifest file, calls the Puppeteer script, sends an email if successful,
 // and moves the manifest to the error or success folder. In cli mode it returns the saved
-// video's path, and reports progress to the CLI's current job.
-func ProcessJob(manifestPath string, mode string, outputPath string) (string, error) {
-	saved, err := processJob(manifestPath, mode, outputPath)
+// video's path, and reports progress to the CLI's current job. Cancelling ctx interrupts
+// the Node runner or ffmpeg, whichever is running.
+func ProcessJob(ctx context.Context, manifestPath string, mode string, outputPath string) (string, error) {
+	saved, err := processJob(ctx, manifestPath, mode, outputPath)
 	// A failed serve job used to stay in new/ (the watcher only reacts to new files,
 	// so it was never retried) unless the failure was the email step. Every failure
 	// now records its error in the manifest and lands in error/. Its webm/mp4 stay in
@@ -125,7 +125,7 @@ func moveManifestToErrorFolder(manifestPath string) {
 	}
 }
 
-func processJob(manifestPath string, mode string, outputPath string) (string, error) {
+func processJob(ctx context.Context, manifestPath string, mode string, outputPath string) (string, error) {
 	job := progress.Current()
 	base := filepath.Base(manifestPath)
 	manifest, err := files.UnmarshalManifest(manifestPath)
@@ -170,13 +170,13 @@ func processJob(manifestPath string, mode string, outputPath string) (string, er
 	PlanProgress(job, manifestActions(manifest), manifest.CodeVideoIDEProps, renderMode, manifest.RenderWorkers)
 	job.Begin(progress.Starting)
 	if renderMode == types.RenderModeDeterministic {
-		if err := processDeterministicJob(manifestPath, manifest, mp4Path); err != nil {
+		if err := processDeterministicJob(ctx, manifestPath, manifest, mp4Path); err != nil {
 			utils.AddErrorToManifest(manifestPath, err.Error())
 			return "", err
 		}
 	} else {
 		// Call the Puppeteer script using node with the uuid and explicit output path.
-		if err := RunPuppeteerForUUID(uuid, manifestPath, webmPath, jobOrientation(manifest)); err != nil {
+		if err := RunPuppeteerForUUID(ctx, uuid, manifestPath, webmPath, jobOrientation(manifest)); err != nil {
 			log.Printf("Puppeteer recording failed for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
 			return "", fmt.Errorf("recording failed: %w", err)
@@ -184,7 +184,7 @@ func processJob(manifestPath string, mode string, outputPath string) (string, er
 
 		// Puppeteer succeeded, now convert to mp4
 		log.Debugf("Converting webm to mp4 for job %s", uuid)
-		if err := utils.ConvertToMp4(webmPath, mp4Path); err != nil {
+		if err := utils.ConvertToMp4(ctx, webmPath, mp4Path); err != nil {
 			log.Printf("Failed to convert webm to mp4 for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, fmt.Sprintf("Failed to convert video: %v", err))
 			return "", fmt.Errorf("converting to mp4 failed: %w", err)
@@ -205,7 +205,7 @@ func processJob(manifestPath string, mode string, outputPath string) (string, er
 		}
 
 		log.Printf("Uploading mp4 for job %s", uuid)
-		mp4Url, err := cloud.UploadFileToS3(context.Background(), mp4Bytes, "v3/video", uuid+".mp4")
+		mp4Url, err := cloud.UploadFileToS3(ctx, mp4Bytes, "v3/video", uuid+".mp4")
 		if err != nil {
 			log.Printf("Failed to upload file for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, err.Error())
@@ -392,7 +392,8 @@ func manifestActions(manifest *types.CodeVideoManifest) []types.Action {
 
 // RunPuppeteerForUUID records the job's webm. The runner's progress lines go
 // to the CLI's current job and the rest of its output to the debug log.
-func RunPuppeteerForUUID(uuid string, manifestPath string, webmOutputPath string, orientation string) error {
+// Cancelling ctx interrupts the runner, which closes Chrome and exits.
+func RunPuppeteerForUUID(ctx context.Context, uuid string, manifestPath string, webmOutputPath string, orientation string) error {
 	// Access the global configuration
 	resolution := config.GlobalConfig.Resolution
 
@@ -405,7 +406,7 @@ func RunPuppeteerForUUID(uuid string, manifestPath string, webmOutputPath string
 
 	log.Debugf("Using node script at: %s", nodeScriptPath)
 
-	cmd := exec.Command("node", nodeScriptPath,
+	cmd := utils.CommandContext(ctx, "node", nodeScriptPath,
 		"--uuid", uuid,
 		"--os", os.Getenv("OPERATING_SYSTEM"),
 		"--resolution", resolution,

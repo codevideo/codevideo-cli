@@ -68,7 +68,7 @@ func TestDeterministicSpeechRender(t *testing.T) {
 		t.Fatal(err)
 	}
 	output := filepath.Join(dir, "speech.mp4")
-	if err := processDeterministicJob(manifestPath, manifest, output); err != nil {
+	if err := processDeterministicJob(context.Background(), manifestPath, manifest, output); err != nil {
 		t.Fatal(err)
 	}
 	var trace struct {

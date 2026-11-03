@@ -1,0 +1,17 @@
+── 0:00 narration starts ──
+{"stage":"Narration","fraction":0,"elapsed":0,"total":41,"detail":"clip 1/2"}
+── 0:02 first clip generated ──
+{"stage":"Narration","fraction":0.049,"elapsed":2,"total":41,"detail":"clip 2/2"}
+── 0:04 browser starting ──
+{"stage":"Starting browser","fraction":0.098,"elapsed":4,"total":41,"detail":""}
+── 0:16 inside the first action ──
+{"stage":"Recording","fraction":0.4,"elapsed":16,"total":40,"detail":"action 1/3"}
+── 0:19 second action, a little slower than planned ──
+{"warning":"log lines print above the bar"}
+{"stage":"Recording","fraction":0.439,"elapsed":19,"total":43.3,"detail":"action 2/3"}
+── 0:25 closing the browser ──
+{"stage":"Closing browser","fraction":0.584,"elapsed":25,"total":42.8,"detail":""}
+── 0:32 encoding halfway ──
+{"stage":"Encoding","fraction":0.8,"elapsed":32,"total":40,"detail":""}
+── 0:37 saved ──
+{"stage":"Done","fraction":1,"elapsed":37,"total":37,"detail":""}

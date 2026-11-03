@@ -2,6 +2,7 @@ package elevenlabs
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -53,8 +54,8 @@ func applyCustomTransforms(text string) string {
 }
 
 // getAudioArrayBufferElevenLabs sends a POST request to ElevenLabs’ TTS API
-// and returns the audio data as a byte slice.
-func GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId string) ([]byte, error) {
+// and returns the audio data as a byte slice. Cancelling ctx abandons the request.
+func GetAudioArrayBufferElevenLabs(ctx context.Context, textToSpeak, ttsApiKey, ttsVoiceId string) ([]byte, error) {
 	// Apply any custom transforms
 	textToSpeak = applyCustomTransforms(textToSpeak)
 
@@ -95,7 +96,7 @@ func GetAudioArrayBufferElevenLabs(textToSpeak, ttsApiKey, ttsVoiceId string) ([
 
 	// Build the ElevenLabs API URL.
 	url := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s", ttsVoiceId)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}

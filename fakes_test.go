@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -14,7 +16,7 @@ import (
 // Stand-ins for the programs the CLI runs. Each does just enough for the CLI:
 // the progress lines and output files it reads, plus some chatter for the
 // debug log. TestMain puts them on the scripts' PATH as node, ffmpeg and
-// ffprobe.
+// ffprobe, and puts chrome there for the runner to start.
 
 // fakeStep waits for one simulated step: FAKE_STEP_MS, or 150ms.
 func fakeStep() {
@@ -50,7 +52,8 @@ func runnerFlags(args []string) map[string]string {
 
 // fakeNode plays the Node runner named by its first argument. FAKE_RUNNER
 // picks a failure: "chrome" fails the way a bad CODEVIDEO_CHROME_PATH does,
-// "crash" dies without explaining itself.
+// "crash" dies without explaining itself, and "hang" starts a browser and
+// records until it is stopped.
 func fakeNode() {
 	args := os.Args[1:]
 	if len(args) == 0 {
@@ -83,6 +86,8 @@ func fakeRecorder(flags map[string]string) int {
 		fmt.Fprintln(os.Stderr, "TypeError: Cannot read properties of undefined (reading 'evaluate')")
 		fmt.Fprintln(os.Stderr, "    at recordVideoV3 (recordVideoV3.js:215:20)")
 		return 1
+	case "hang":
+		return fakeEndlessRecording()
 	}
 	actions, err := manifestActionCount(flags["manifest-path"])
 	if err != nil {
@@ -146,6 +151,45 @@ func fakeFrameRenderer(flags map[string]string) int {
 		}
 	}
 	return 0
+}
+
+// fakeEndlessRecording starts a browser and records until it gets an
+// interrupt. Then, as puppeteer does on SIGINT, it kills the browser and exits
+// 130. Any other signal kills it outright and leaves the browser running. Once
+// the browser runs, FAKE_PID_FILE lists this process and the browser.
+func fakeEndlessRecording() int {
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+	browser := exec.Command("chrome")
+	if err := browser.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, "fake node:", err)
+		return 1
+	}
+	pids := fmt.Sprintf("%d\n%d\n", os.Getpid(), browser.Process.Pid)
+	// Written whole, then renamed, so it's never read half written.
+	pidFile := os.Getenv("FAKE_PID_FILE")
+	if err := os.WriteFile(pidFile+".tmp", []byte(pids), 0644); err != nil {
+		fmt.Fprintln(os.Stderr, "fake node:", err)
+		return 1
+	}
+	if err := os.Rename(pidFile+".tmp", pidFile); err != nil {
+		fmt.Fprintln(os.Stderr, "fake node:", err)
+		return 1
+	}
+	emitProgress(map[string]any{"stage": "recording"})
+	select {
+	case <-interrupt:
+	case <-time.After(2 * time.Minute): // a broken test leaves nothing behind for long
+	}
+	browser.Process.Kill()
+	browser.Wait()
+	return 130
+}
+
+// fakeChrome is the browser a runner starts: it runs until it's killed, or
+// for two minutes.
+func fakeChrome() {
+	time.Sleep(2 * time.Minute)
 }
 
 func manifestActionCount(path string) (int, error) {

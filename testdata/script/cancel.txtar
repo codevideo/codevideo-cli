@@ -1,0 +1,20 @@
+# SIGTERM sent to the CLI alone, the way a program cancels it, reaches the
+# runner: the CLI interrupts it, the runner stops its browser, and the CLI
+# says so and exits 130.
+[windows] skip 'Windows has no SIGTERM to send to one process'
+
+env FAKE_RUNNER=hang
+sigterm $FAKE_PID_FILE codevideo -p '[{"name":"editor-type","value":"let x = 1;"}]' -o out/video.mp4
+! stdout .
+stderr '^\[ *\d+%\] Recording · '
+stderr '^Cancelled$'
+! stderr 'error'
+gone $FAKE_PID_FILE
+! exists out/video.mp4
+
+# With --progress json the last line says so. The browser starts too fast
+# here for its stage to show every time.
+sigterm $FAKE_PID_FILE codevideo --progress json -p '[{"name":"editor-type","value":"let x = 1;"}]' -o out/video.mp4
+jsonlines
+stdout '^stages: (Starting browser, )?Recording\nerror: cancelled\nlog: logs/codevideo\.log\n\z'
+gone $FAKE_PID_FILE

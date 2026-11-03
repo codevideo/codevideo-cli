@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,9 +18,9 @@ import (
 	"github.com/google/uuid"
 )
 
-func processDeterministicJob(manifestPath string, manifest *types.CodeVideoManifest, output string) error {
+func processDeterministicJob(ctx context.Context, manifestPath string, manifest *types.CodeVideoManifest, output string) error {
 	started := time.Now()
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 	defer cancel()
 	manifest.RenderMode = types.RenderModeDeterministic
 	strategy, strategyErr := types.ResolveRenderStrategy(manifest.RenderStrategy)
@@ -90,15 +89,9 @@ func processDeterministicJob(manifestPath string, manifest *types.CodeVideoManif
 	if config.GlobalConfig.Headed {
 		args = append(args, "--debug")
 	}
-	command := exec.CommandContext(ctx, "node", args...)
-	// Let the Node runner close browsers and encoders before forcing termination.
-	command.Cancel = func() error {
-		if err := command.Process.Signal(os.Interrupt); err != nil {
-			return command.Process.Kill()
-		}
-		return nil
-	}
-	command.WaitDelay = 10 * time.Second
+	// A timeout or cancel lets the Node runner close browsers and encoders
+	// before it is killed.
+	command := utils.CommandContext(ctx, "node", args...)
 	job := progress.Current()
 	if err := runRunner(command, "Deterministic renderer", job); err != nil {
 		return fmt.Errorf("deterministic renderer failed: %w", err)

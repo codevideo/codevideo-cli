@@ -113,6 +113,12 @@ With a course:
 ./codevideo -p "$(cat data/course.json)"
 ```
 
+Or pass the file itself with `--project-file`, which has no size limit (one `-p` argument is capped at 128 KiB on Linux, and a whole Windows command line at about 32K characters). It can't be combined with `-p`:
+
+```shell
+./codevideo --project-file data/lesson.json
+```
+
 ## Complex CLI Example - Actions, With Given Output Path, and Open when Done
 
 ```shell
@@ -130,6 +136,7 @@ By default the CLI shows the progress bar, any warnings or errors, and the saved
 | `-q`, `--quiet` | Hide the bar and status lines; errors and the saved path still print |
 | `--headed` | Show the browser window instead of running it headless (replaces `-d`/`--debug`, which still works with a deprecation notice) |
 | `--slack-webhook-url <url>` | Post progress to a Slack incoming webhook at each stage and every 25% |
+| `--progress json` | Write stderr as one JSON object per line, for programs that run the CLI (default `human`; `--progress=json` works too) |
 
 The bar, status and log lines go to stderr; the "saved to" line goes to stdout, one per video. When stderr isn't a terminal (CI, pipes, `TERM=dumb`), the bar is replaced by a plain line at each stage and every 25%:
 
@@ -144,6 +151,10 @@ A course shows an overall bar with one bar per lesson below it. Every lesson is 
   1 Variables      [================] 100%  Done
   2 Printing valu… [=               ]  12%  Starting browser
 ```
+
+With `--progress json`, every stderr line is a JSON object: progress at each stage, every 25% and at least once a second (`{"stage":"Recording","fraction":0.38,"elapsed":42.1,"total":110.4,"detail":"action 4/12"}`, plus `"lesson"` from 1 on a course's lesson lines), log lines keyed by level (`{"warning":"..."}`), and at the end one `{"result":"/absolute/path.mp4"}` per saved video or `{"error":"...","log":"/path/codevideo.log"}`. Stages are `Narration`, `Starting browser`, `Recording`, `Closing browser`, `Planning timeline`, `Rendering frames`, `Encoding` and `Done`. stdout keeps its "saved to" lines.
+
+Ctrl-C, or SIGTERM sent to the CLI alone, stops the render: the CLI interrupts the Node runner (which closes Chrome) or ffmpeg, kills it if it hasn't exited 10 seconds later, prints `Cancelled` (`{"error":"cancelled",...}` in JSON) and exits 130.
 
 The estimate comes from the actions themselves (typing speed, pauses, narration length), using the measured length of each narration clip once it's generated, and is refined from the browser, ffmpeg and frame capture rates as the render runs. In serve mode the worker keeps logging everything to stdout and posting to `CODEVIDEO_SLACK_WEBHOOK_URL`.
 

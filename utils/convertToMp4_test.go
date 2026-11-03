@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -110,11 +111,40 @@ func TestMediaSecondsReadsHeaderlessWebm(t *testing.T) {
 		t.Skipf("no libvpx encoder: %v %s", err, stderr.String())
 	}
 	file.Close()
-	seconds, err := mediaSeconds(webm)
+	seconds, err := mediaSeconds(context.Background(), webm)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if seconds < 1.9 || seconds > 2 {
 		t.Fatalf("mediaSeconds = %v, want about 2", seconds)
+	}
+}
+
+// Cancelling the render interrupts ffmpeg rather than killing it, so it can
+// finish the file it's writing, and the conversion returns at once.
+func TestConvertToMp4StopsWhenCancelled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake ffmpeg is a shell script")
+	}
+	dir := t.TempDir()
+	ffmpeg := filepath.Join(dir, "ffmpeg")
+	// exec, so the interrupt reaches sleep itself.
+	if err := os.WriteFile(ffmpeg, []byte("#!/bin/sh\nexec sleep 30\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CODEVIDEO_FFMPEG_PATH", ffmpeg)
+	input := filepath.Join(dir, "recording.webm")
+	if err := os.WriteFile(input, []byte("fake webm"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	started := time.Now()
+	err := ConvertToMp4(ctx, input, filepath.Join(dir, "video.mp4"))
+	if err == nil || !strings.Contains(err.Error(), "signal: interrupt") {
+		t.Fatalf("err = %v, want ffmpeg stopped by an interrupt", err)
+	}
+	if took := time.Since(started); took > StopDelay/2 {
+		t.Fatalf("returned after %v", took)
 	}
 }

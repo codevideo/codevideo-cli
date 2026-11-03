@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -42,8 +42,7 @@ var rootCmd = &cobra.Command{
 		serve := mode == "serve"
 
 		// Setup logging configuration
-		logPath, err := setupLogging(cmd, serve)
-		if err != nil {
+		if err := setupLogging(cmd, serve); err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			os.Exit(1)
 		}
@@ -72,9 +71,15 @@ var rootCmd = &cobra.Command{
 		// CLI functionality
 		err = cli.Execute(cmd)
 		notify.Flush(10 * time.Second)
+		if errors.Is(err, cli.ErrCancelled) {
+			// 130 is the shell's code for a command stopped by Ctrl-C.
+			renderer.Cancelled()
+			srv.Stop()
+			os.Exit(130)
+		}
 		if err != nil {
 			log.Errorf("%v", err)
-			fmt.Fprintf(os.Stderr, "See the log for details: %s\n", logPath)
+			renderer.Failed()
 			srv.Stop()
 			os.Exit(1)
 		}
@@ -84,16 +89,21 @@ var rootCmd = &cobra.Command{
 // setupLogging writes every log line to a rotating log file. Serve mode also
 // writes them to stdout for the worker's container logs. The CLI keeps the
 // terminal for its progress bar: warnings and errors print above it, -v adds
-// info lines, --log-level picks any level, and -q leaves errors only.
-func setupLogging(cmd *cobra.Command, serve bool) (string, error) {
+// info lines, --log-level picks any level, and -q leaves errors only. With
+// --progress json they print as JSON lines instead.
+func setupLogging(cmd *cobra.Command, serve bool) error {
 	level, err := consoleLevel(cmd, serve)
 	if err != nil {
-		return "", err
+		return err
+	}
+	format, err := progressFormat(cmd)
+	if err != nil {
+		return err
 	}
 
 	logDir := constants.LogFolder()
 	if err := os.MkdirAll(logDir, 0755); err != nil {
-		return "", fmt.Errorf("creating log directory %s: %w", logDir, err)
+		return fmt.Errorf("creating log directory %s: %w", logDir, err)
 	}
 	logPath := filepath.Join(logDir, "codevideo.log")
 
@@ -111,18 +121,18 @@ func setupLogging(cmd *cobra.Command, serve bool) (string, error) {
 		log.SetOutput(io.MultiWriter(os.Stdout, logRotate))
 		log.SetLevel(level)
 		log.Printf("/> CodeVideo CLI v%s - logs saved to: %s", version, logPath)
-		return logPath, nil
+		return nil
 	}
 
 	quiet, _ := cmd.Flags().GetBool("quiet")
-	renderer.Configure(os.Stderr, quiet)
+	renderer.Configure(os.Stderr, renderer.Options{Format: format, Quiet: quiet, LogPath: logPath})
 	log.SetOutput(logRotate)
 	log.SetLevel(max(level, log.DebugLevel)) // the file gets everything
 	log.AddHook(&consoleHook{level: level})
 	log.RegisterExitHandler(renderer.Stop)
 	log.Debugf("/> CodeVideo CLI v%s", version)
 	log.Infof("Logs saved to: %s", logPath)
-	return logPath, nil
+	return nil
 }
 
 // consoleLevel is the most detailed log level shown in the terminal (serve
@@ -149,6 +159,16 @@ func consoleLevel(cmd *cobra.Command, serve bool) (log.Level, error) {
 	return log.WarnLevel, nil
 }
 
+// progressFormat reads --progress: human (the default) or json.
+func progressFormat(cmd *cobra.Command) (renderer.Format, error) {
+	value, _ := cmd.Flags().GetString("progress")
+	switch format := renderer.Format(value); format {
+	case renderer.Human, renderer.JSON:
+		return format, nil
+	}
+	return "", fmt.Errorf("invalid --progress %q: use human or json", value)
+}
+
 // consoleHook prints log lines at or above a level above the progress bar.
 // Info lines print as they are; other levels are prefixed ("warning: ...").
 type consoleHook struct{ level log.Level }
@@ -156,16 +176,8 @@ type consoleHook struct{ level log.Level }
 func (h *consoleHook) Levels() []log.Level { return log.AllLevels[:h.level+1] }
 
 func (h *consoleHook) Fire(entry *log.Entry) error {
-	renderer.Println(consoleLine(entry.Level, entry.Message))
+	renderer.Log(entry.Level.String(), entry.Message)
 	return nil
-}
-
-func consoleLine(level log.Level, message string) string {
-	message = strings.TrimRight(message, "\n")
-	if level == log.InfoLevel {
-		return message
-	}
-	return level.String() + ": " + message
 }
 
 func init() {
@@ -180,8 +192,11 @@ func addFlags(cmd *cobra.Command) {
 	// --mode or -m flag for running in server mode
 	cmd.Flags().StringP("mode", "m", "", "Run mode (use 'serve' for file watcher mode)")
 
-	// --project or -p flag for specifying project JSON data
+	// --project or -p flag for specifying project JSON data, or --project-file
+	// for a file of it: one argument is capped at 128 KiB on Linux
 	cmd.Flags().StringP("project", "p", "", "Project data (Actions, Lesson, or Course) in JSON format")
+	cmd.Flags().String("project-file", "", "Read the project data (Actions, Lesson, or Course) from this JSON file")
+	cmd.MarkFlagsMutuallyExclusive("project", "project-file")
 
 	// --output or -o flag for specifying output file path
 	cmd.Flags().StringP("output", "o", "", "Output file path")
@@ -198,6 +213,7 @@ func addFlags(cmd *cobra.Command) {
 	cmd.MarkFlagsMutuallyExclusive("verbose", "quiet")
 	cmd.Flags().String("log-level", "", "Most detailed log level to show: error, warn, info, debug or trace (the log file always gets debug)")
 	cmd.Flags().String("slack-webhook-url", "", "Post progress to this Slack incoming webhook at each stage and every 25%")
+	cmd.Flags().String("progress", string(renderer.Human), "Progress on stderr: human (a bar, or plain lines when stderr isn't a terminal) or json (one JSON object per line)")
 
 	// --version or -V flag for displaying version
 	cmd.Flags().BoolP("version", "V", false, "Display version information")
