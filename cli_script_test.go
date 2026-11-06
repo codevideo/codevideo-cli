@@ -40,6 +40,17 @@ func TestMain(m *testing.M) {
 }
 
 func TestScripts(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// On Windows, testscript's LookPath searches "." first. If a built binary exists
+		// in the current directory, it resolves "codevideo" to ".\codevideo.exe" instead
+		// of the test's wrapper in PATH, triggering os/exec.ErrDot.
+		if _, err := os.Stat("codevideo.exe"); err == nil {
+			_ = os.Rename("codevideo.exe", "codevideo.exe.test_tmp")
+			t.Cleanup(func() {
+				_ = os.Rename("codevideo.exe.test_tmp", "codevideo.exe")
+			})
+		}
+	}
 	params := testscript.Params{
 		Dir:                 filepath.Join("testdata", "script"),
 		Setup:               setupScript,

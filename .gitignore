@@ -33,3 +33,5 @@ npm/packages/codevideo-cli/runtime/virtualClock.js
 npm/packages/codevideo-cli/runtime/renderSegments.js
 
 /codevideo
+/codevideo.exe
+*.exe
