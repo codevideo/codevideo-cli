@@ -206,9 +206,14 @@ func generateAudioItems(ctx context.Context, actions []types.Action) ([]types.Au
 				if err != nil {
 					return nil, fmt.Errorf("error converting text to audio: %w", err)
 				}
-				mp3Url, err = cloud.UploadFileToS3(ctx, audioData, "v3/audio", fmt.Sprintf("%s.mp3", textHash))
-				if err != nil {
-					return nil, fmt.Errorf("error uploading audio to S3: %w", err)
+				// If S3 credentials are configured, upload to S3; otherwise embed as base64 data URI
+				if os.Getenv("CODEVIDEO_S3_KEY_ID") != "" && os.Getenv("CODEVIDEO_S3_SECRET") != "" {
+					mp3Url, err = cloud.UploadFileToS3(ctx, audioData, "v3/audio", fmt.Sprintf("%s.mp3", textHash))
+					if err != nil {
+						return nil, fmt.Errorf("error uploading audio to S3: %w", err)
+					}
+				} else {
+					mp3Url = "data:audio/mpeg;base64," + base64.StdEncoding.EncodeToString(audioData)
 				}
 			}
 			audioManifest = append(audioManifest, types.AudioItem{
