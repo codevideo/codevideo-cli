@@ -38,7 +38,7 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# The compiled worker. The Gatsby static site is go:embed'd into the binary, so
+# The compiled worker. The static site is go:embed'd into the binary, so
 # nothing else is needed for the manifest/static servers.
 COPY --from=build /out/codevideo /app/codevideo
 

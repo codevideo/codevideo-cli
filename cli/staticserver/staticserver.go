@@ -28,14 +28,17 @@ type Server struct {
 	manifestListener net.Listener
 }
 
-//go:embed public
+// The all: prefix matters: without it Go silently skips names starting with "_",
+// and all of the site's assets live in _next.
+//
+//go:embed all:public
 var public embed.FS
 
 // Start creates and starts a new HTTP server that serves the embedded public folder.
 func Start(ctx context.Context) (*Server, error) {
 
 	// Create a new server instance.
-	srv, err := NewServer(constants.DEFAULT_GATSBY_PORT, constants.DEFAULT_SERVER_TIMEOUT)
+	srv, err := NewServer(constants.DEFAULT_STATIC_SITE_PORT, constants.DEFAULT_SERVER_TIMEOUT)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create server: %w", err)
 	}

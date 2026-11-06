@@ -51,7 +51,7 @@ var rootCmd = &cobra.Command{
 		renderer.OnMilestone(func(m renderer.Milestone) { notify.Queue(m.Text()) })
 
 		// for either CLI or server mode, we need to start the required servers:
-		// start static server for the built gatsby files (7001) and the manifest files it needs (7000)
+		// start static server for the built site (7001) and the manifest files it needs (7000)
 		ctx := context.Background()
 		srv, err := staticserver.Start(ctx)
 		if err != nil {
@@ -61,7 +61,7 @@ var rootCmd = &cobra.Command{
 		if srv.ManifestServerStarted() {
 			log.Debugf("Manifest server started on port %d", constants.DEFAULT_MANIFEST_SERVER_PORT)
 		}
-		log.Debugf("Static server started on port %d", constants.DEFAULT_GATSBY_PORT)
+		log.Debugf("Static server started on port %d", constants.DEFAULT_STATIC_SITE_PORT)
 
 		if serve {
 			// Server functionality (API use case)

@@ -86,7 +86,7 @@ async function createScene(options) {
     await page.evaluate(async (session, useNativeClock) => {
       const state = window.__codeVideoRenderState;
       if (state.error) throw new Error(state.error);
-      if (state.version !== 3) throw new Error('Unsupported CodeVideo render bridge; rebuild the embedded Gatsby app');
+      if (state.version !== 3) throw new Error('Unsupported CodeVideo render bridge; rebuild the embedded site');
       // Monaco caches font metrics even when its initial model is hidden.
       // Refresh after loading Fira Code so cold and restored editors agree.
       window.monaco.editor.remeasureFonts();

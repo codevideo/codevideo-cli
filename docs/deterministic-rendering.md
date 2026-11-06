@@ -22,7 +22,7 @@ The manifest may contain `renderMode`, `renderSeed`, `renderWorkers`, and `rende
 | codevideo-cli | `main.go`, `cli/config/config.go`, `cli/generator/generator.go`, `cli/cli.go`, `types/{types,renderMode,renderTrace}.go` | Flags, manifest propagation, mode validation, errors returned to CLI. |
 | codevideo-cli | `server/{server,deterministic}.go`, `utils/{prepareRenderAudio,muxRenderAudio}.go`, `constants/constants.go` | Dispatch, asset materialization/probing, offline audio mux, trace/metrics, cleanup. |
 | codevideo-cli | `puppeteer-runner/{virtualClock,renderFramesV1}.js`, package manifests/locks, `npm/scripts/{prepare,verify}-packages.mjs` | Virtual clock, planning pass, browser workers, FFmpeg encoding and npm runtime packaging. |
-| codevideo-cli | `cli/staticserver/public/` | Generated Gatsby assets embedded in the Go executable. Must be regenerated after React changes. |
+| codevideo-cli | `cli/staticserver/public/` | The generated example site (a Next.js static export) embedded in the Go executable. Must be regenerated after React changes. |
 | codevideo-api | `DEPLOYMENT.md` | Release order and isolated rollout guidance. No public API behavior or active image pin changes. |
 
 `codevideo-virtual-ide` and the legacy `recordVideoV3.js` / `ConvertToMp4` path stay as they are. Checkpoint payloads belong to the React package, not the shared types or virtual-state packages. Arbitrary seeking, distributed execution, incremental rendering and frame deduplication remain out of scope.
@@ -81,10 +81,10 @@ Monaco syntax colors remain; asynchronous diagnostics, semantic highlights, unus
 
 ## Validation and local integration
 
-Use Node 20 or 22 for Gatsby. Install dependencies in types, React, React/example and CLI/puppeteer-runner first. From the React repo:
+Install dependencies in types, React, React/example and CLI/puppeteer-runner first. From the React repo:
 
 ```bash
-# Build local types/keyboard → React → clean Gatsby → embedded CLI. No npm publication.
+# Build local types/keyboard → React → clean Next build → embedded CLI. No npm publication.
 bash scripts/golden/embed-local.sh
 # Golden fixture, no paid TTS or Slack. quick: legacy vs ab-initio at 1/2/4/8
 # workers, one run each (~3 min); full: both strategies and both typing
@@ -97,7 +97,7 @@ scripts/golden/bench.sh full
 
 `CODEVIDEO_TYPES_DIR`, `CODEVIDEO_CLI_DIR`, `CODEVIDEO_BUILD_OUTPUT` and `CODEVIDEO_CLI_BINARY` support alternate sibling/build locations. The benchmark uses a fresh output directory, preserves logs/videos/sidecars and checks trace equality, sampled JPEG equality, encoded frame counts and 60 fps. It reports end-to-end wall time separately from planning/capture time. It refuses to overwrite previous results.
 
-Checks: types build/type-check/tests; React build/type-check/Jest and Gatsby SSR build; `go test ./...`; `npm test --prefix puppeteer-runner` (Chrome required); `npm run prepare:packages --prefix npm && npm test --prefix npm`. `CODEVIDEO_BROWSER_TESTS=1 go test ./server -run TestDeterministicSpeechRender -v` exercises the full speech render without a TTS service. Go audio integration uses generated tones to check downloads/data URIs, deduplication, cue delays, overlap and the final tail without a TTS service.
+Checks: types build/type-check/tests; React build/type-check/Jest and the example's Next static export build; `go test ./...`; `npm test --prefix puppeteer-runner` (Chrome required); `npm run prepare:packages --prefix npm && npm test --prefix npm`. `CODEVIDEO_BROWSER_TESTS=1 go test ./server -run TestDeterministicSpeechRender -v` exercises the full speech render without a TTS service. Go audio integration uses generated tones to check downloads/data URIs, deduplication, cue delays, overlap and the final tail without a TTS service.
 
 ## Release order
 
@@ -105,7 +105,7 @@ The current local workflow consumes unpublished source overlays; publishing is a
 
 1. Release the additive shared types changes.
 2. Update React's types dependency and lockfile to that published release; run its checks, then release React.
-3. Update `example/` types and React dependencies/lockfile to those releases. **Clean Gatsby's cache** (node_modules overlays can otherwise retain stale bundles), rebuild the site, copy `public/`, then rebuild/package the CLI and worker image.
+3. Update `example/` types and React dependencies/lockfile to those releases. **Clean Next's cache** with `npm run clean` (node_modules overlays can otherwise retain stale bundles), rebuild the site, copy `out/` to `cli/staticserver/public/`, then rebuild/package the CLI and worker image.
 4. Release the CLI npm platform packages/wrapper and Docker image together with the new JS runtime files. Use the existing release scripts; do not publish only the Go binary.
 5. Update the API worker image pin only after that image exists. Keep realtime default; use explicit deterministic manifests on an isolated test queue before enabling any shared worker default.
 

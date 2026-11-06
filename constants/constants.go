@@ -13,7 +13,7 @@ const (
 	TOKEN_DECREMENT_AMOUNT       = 10
 	MAX_CONCURRENT_JOBS          = 2 // default for an 8 GB server serving both staging and prod; override with CODEVIDEO_MAX_CONCURRENT_JOBS
 	DEFAULT_MANIFEST_SERVER_PORT = 7000
-	DEFAULT_GATSBY_PORT          = 7001
+	DEFAULT_STATIC_SITE_PORT     = 7001
 	DEFAULT_SERVER_TIMEOUT       = time.Second * 5
 )
 
