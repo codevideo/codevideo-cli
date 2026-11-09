@@ -126,6 +126,7 @@ var keyPress = map[string]bool{
 	"editor-shift+end": true, "editor-shift+home": true,
 	"editor-command-left": true, "editor-command-right": true,
 	"editor-tab": true, "editor-enter": true, "editor-space": true, "editor-backspace": true,
+	"editor-command-c": true, "editor-command-x": true, "editor-command-v": true,
 }
 
 // repeatable mirrors codevideo-types' RepeatableActionNames: these actions run
@@ -136,7 +137,7 @@ var repeatable = map[string]bool{
 	"editor-shift+arrow-left": true, "editor-shift+arrow-right": true, "editor-shift+arrow-down": true, "editor-shift+arrow-up": true,
 	"editor-cmd+d": true, "editor-backspace": true, "editor-space": true,
 	"editor-command+shift+arrow-right": true, "editor-command+shift+arrow-left": true, "editor-shift+end": true, "editor-shift+home": true,
-	"editor-command-left": true, "editor-command-right": true, "editor-command-d": true, "editor-command-c": true, "editor-command-v": true,
+	"editor-command-left": true, "editor-command-right": true, "editor-command-d": true, "editor-command-c": true, "editor-command-x": true, "editor-command-v": true,
 	"editor-shift-down-arrow": true, "editor-shift-up-arrow": true,
 	"mouse-move-file-explorer": true, "mouse-move-editor": true, "mouse-move-terminal": true,
 	"mouse-move-file-explorer-context-menu-new-file": true, "mouse-move-file-explorer-context-menu-new-folder": true,

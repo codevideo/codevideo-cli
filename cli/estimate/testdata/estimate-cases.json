@@ -33,6 +33,18 @@
         { "name": "editor-type", "value": "héllo 👋" }
       ],
       "expectedMs": [3700, 600, 2300, 500, 500, 2900, 660]
+    },
+    {
+      "name": "copy, cut and paste take a typing pause per press; clipboard actions take nothing",
+      "options": {},
+      "actions": [
+        { "name": "clipboard-set-text", "value": "const data = [1, 2, 3];" },
+        { "name": "editor-command-c", "value": "1" },
+        { "name": "editor-command-x", "value": "2" },
+        { "name": "editor-command-v", "value": "3" },
+        { "name": "clipboard-clear", "value": "1" }
+      ],
+      "expectedMs": [1000, 1050, 1100, 1150, 1000]
     }
   ]
 }
