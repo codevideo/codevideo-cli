@@ -138,6 +138,7 @@ type CodeVideoIDEProps struct {
 	WordWrap                 *string            `json:"wordWrap,omitempty"`
 	IsTerminalVisible        *bool              `json:"isTerminalVisible,omitempty"`
 	IsMouseVisible           *bool              `json:"isMouseVisible,omitempty"`
+	IsDiagnosticsVisible     *bool              `json:"isDiagnosticsVisible,omitempty"`
 	KeyboardTypingPauseMs    *int               `json:"keyboardTypingPauseMs,omitempty"`
 	IncludeTypos             *bool              `json:"includeTypos,omitempty"`
 	KeyboardTypingJitterMs   *int               `json:"keyboardTypingJitterMs,omitempty"`

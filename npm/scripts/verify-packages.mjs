@@ -32,8 +32,15 @@ for (const target of targets) {
   const binary = path.join(dir, "bin", target.executable);
   const stat = fs.statSync(binary, { throwIfNoEntry: false });
   if (!stat?.isFile()) throw new Error(`Missing binary: ${binary}`);
-  if (stat.size < 15 * 1024 * 1024 || stat.size > 30 * 1024 * 1024) {
-    throw new Error(`Binary size is outside the expected 15-30 MB range: ${binary}`);
+  // Since the render site moved from Gatsby (about 12 MB) to Next.js (about
+  // 2.5 MB), the binaries are about 12-13 MB, too close to a binary without
+  // the site for size alone to tell them apart. So check for the page the
+  // renderer loads as well.
+  if (stat.size < 10 * 1024 * 1024 || stat.size > 30 * 1024 * 1024) {
+    throw new Error(`Binary size is outside the expected 10-30 MB range: ${binary}`);
+  }
+  if (!fs.readFileSync(binary).includes("public/v3/index.html")) {
+    throw new Error(`Binary does not embed the render site (public/v3/index.html): ${binary}`);
   }
   if (target.platform !== "win32" && (stat.mode & 0o111) === 0) {
     throw new Error(`Binary is not executable: ${binary}`);

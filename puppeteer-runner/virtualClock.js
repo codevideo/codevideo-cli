@@ -32,12 +32,26 @@ function installVirtualClock() {
     return channel;
   };
   window.MessageChannel.prototype = native.Channel.prototype;
+  // Work the page hands to track(): results from web workers (e.g. TypeScript
+  // diagnostics), whose messages the MessageChannel count can't see. settle()
+  // waits for it, so its results land in the same virtual frame however long
+  // the real work takes. The wait uses real time, bounded.
+  const tracked = new Set();
+  const TRACKED_TIMEOUT_MS = 60000;
+  const drainTracked = async () => {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = native.timeout(() => reject(new Error(`Virtual clock: tracked work did not finish within ${TRACKED_TIMEOUT_MS / 1000}s`)), TRACKED_TIMEOUT_MS);
+    });
+    try { await Promise.race([Promise.all([...tracked]), timeout]); } finally { native.clear(timer); }
+  };
   const settle = async () => {
     let quiet = 0;
     for (let i = 0; i < 100; i++) {
+      if (tracked.size) { await drainTracked(); quiet = 0; }
       const before = revision;
       await yieldTask();
-      if (before === revision && messages === 0) quiet++; else quiet = 0;
+      if (before === revision && messages === 0 && tracked.size === 0) quiet++; else quiet = 0;
       if (quiet === 2) return;
     }
     throw new Error('Virtual clock: React/message work did not settle');
@@ -111,6 +125,12 @@ function installVirtualClock() {
       await settle();
     },
     settle,
+    track(work) {
+      if (!work || typeof work.then !== 'function') return work;
+      const entry = Promise.resolve(work).then(() => {}, () => {}).finally(() => { tracked.delete(entry); revision++; });
+      tracked.add(entry);
+      return work;
+    },
     atBoundary(callback) {
       if (!active || typeof callback !== 'function') throw new Error('Boundary handshake requires an active clock');
       boundaries.push(callback);

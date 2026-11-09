@@ -79,3 +79,25 @@ test('offset startup and boundary handshake preserve global time and callback or
     assert.ok(Math.abs(events[4][1] - 20050) < 1e-7); assert.equal(events[4][0], 'raf');
   } finally { await browser.close(); }
 });
+
+test('settle waits for tracked work the clock cannot see, such as a web worker', { timeout: 30000 }, async () => {
+  const browser = await puppeteer.launch({ executablePath: resolveChromeExecutable(), headless: true, args: ['--no-sandbox'] });
+  try {
+    const page = await browser.newPage();
+    await page.evaluateOnNewDocument(installVirtualClock);
+    await page.goto('data:text/html,<div></div>');
+    const events = await page.evaluate(async () => {
+      await window.__codeVideoClock.start();
+      const log = [];
+      setTimeout(() => {
+        // The worker answers after 300ms of real time; untracked, its result would land after 'later'.
+        const worker = new Worker(URL.createObjectURL(new Blob(['setTimeout(() => postMessage("done"), 300)'], { type: 'text/javascript' })));
+        window.__codeVideoClock.track(new Promise(resolve => { worker.onmessage = event => { log.push([event.data, performance.now()]); resolve(); }; }));
+      }, 5);
+      setTimeout(() => log.push(['later', performance.now()]), 6);
+      await window.__seek(50);
+      return log;
+    });
+    assert.deepEqual(events, [['done', 5], ['later', 6]]);
+  } finally { await browser.close(); }
+});
