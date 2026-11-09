@@ -3,10 +3,13 @@ package elevenlabs
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 )
@@ -43,19 +46,39 @@ var customSpeechTransforms = map[string]string{
 	"stderr":      "standard error",
 }
 
+// transformOrder applies the longest patterns first, so "console.log" wins over
+// ".log" and ".json" over "json". Ranging over the map gave a different order,
+// and so different speech, on every run.
+var transformOrder = func() []string {
+	keys := make([]string, 0, len(customSpeechTransforms))
+	for key := range customSpeechTransforms {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if len(keys[i]) != len(keys[j]) {
+			return len(keys[i]) > len(keys[j])
+		}
+		return keys[i] < keys[j]
+	})
+	return keys
+}()
+
 // applyCustomTransforms applies all custom text transformations.
 func applyCustomTransforms(text string) string {
-	for key, value := range customSpeechTransforms {
-		if strings.Contains(text, key) {
-			text = strings.ReplaceAll(text, key, value)
-		}
+	for _, key := range transformOrder {
+		text = strings.ReplaceAll(text, key, customSpeechTransforms[key])
 	}
 	return text
 }
 
-// getAudioArrayBufferElevenLabs sends a POST request to ElevenLabs’ TTS API
-// and returns the audio data as a byte slice. Cancelling ctx abandons the request.
-func GetAudioArrayBufferElevenLabs(ctx context.Context, textToSpeak, ttsApiKey, ttsVoiceId string) ([]byte, error) {
+// request is exactly what ElevenLabs is asked for. The same request gives the
+// same clip, so its hash names the clip for reuse (ClipKey).
+type request struct {
+	voiceID string
+	body    []byte
+}
+
+func newRequest(textToSpeak, ttsVoiceId string) (request, error) {
 	// Apply any custom transforms
 	textToSpeak = applyCustomTransforms(textToSpeak)
 
@@ -86,17 +109,40 @@ func GetAudioArrayBufferElevenLabs(ctx context.Context, textToSpeak, ttsApiKey, 
 
 	reqBody, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("error marshalling payload: %w", err)
+		return request{}, fmt.Errorf("error marshalling payload: %w", err)
 	}
 
 	// If no voice id is provided, use the default.
 	if ttsVoiceId == "" {
 		ttsVoiceId = "iP95p4xoKVk53GoZ742B"
 	}
+	return request{voiceID: ttsVoiceId, body: reqBody}, nil
+}
+
+// ClipKey names the clip GetAudioArrayBufferElevenLabs would make: a hash of
+// the voice, the model, the voice settings and the text after the speech
+// transforms. A change to any of them gives a new key, so a reused clip always
+// matches what ElevenLabs would return now.
+func ClipKey(textToSpeak, ttsVoiceId string) (string, error) {
+	r, err := newRequest(textToSpeak, ttsVoiceId)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(append([]byte("elevenlabs-v1\n"+r.voiceID+"\n"), r.body...))
+	return hex.EncodeToString(sum[:]), nil
+}
+
+// GetAudioArrayBufferElevenLabs sends a POST request to ElevenLabs’ TTS API
+// and returns the audio data as a byte slice. Cancelling ctx abandons the request.
+func GetAudioArrayBufferElevenLabs(ctx context.Context, textToSpeak, ttsApiKey, ttsVoiceId string) ([]byte, error) {
+	r, err := newRequest(textToSpeak, ttsVoiceId)
+	if err != nil {
+		return nil, err
+	}
 
 	// Build the ElevenLabs API URL.
-	url := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s", ttsVoiceId)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
+	url := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s", r.voiceID)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(r.body))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}

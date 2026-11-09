@@ -20,10 +20,20 @@ func TestRuntimePathOverrides(t *testing.T) {
 		LogFolder():           filepath.Join(base, "logs"),
 		OutputFolder():        filepath.Join(base, "output"),
 		PuppeteerRunnerPath(): filepath.Join(base, "runner.js"),
+		TTSCacheFolder():      filepath.Join(base, "work", "tts"),
 	}
 	for got, want := range checks {
 		if got != want {
 			t.Fatalf("runtime path = %q, want %q", got, want)
 		}
+	}
+}
+
+func TestTTSCacheFolderOverride(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("CODEVIDEO_WORK_DIR", filepath.Join(base, "work"))
+	t.Setenv("CODEVIDEO_TTS_CACHE_DIR", filepath.Join(base, "clips"))
+	if got, want := TTSCacheFolder(), filepath.Join(base, "clips"); got != want {
+		t.Fatalf("TTSCacheFolder() = %q, want %q", got, want)
 	}
 }

@@ -62,6 +62,10 @@ test("runtime resolver honors explicit binary and creates npm-safe paths", () =>
     assert.equal(runtime.env.CODEVIDEO_WORK_DIR, path.join(temp, "work"));
     assert.equal(runtime.env.CODEVIDEO_LOG_DIR, path.join(temp, "logs"));
     assert.equal(runtime.env.CODEVIDEO_OUTPUT_DIR, path.join(temp, "output"));
+    // Narration clips are kept with the logs by default, not in the temp work folder.
+    assert.equal(runtime.env.CODEVIDEO_TTS_CACHE_DIR, path.join(os.homedir(), ".cache", "codevideo", "tts"));
+    const cached = resolveCodeVideoCliRuntime({ binaryPath: binary, runnerPath: runner, env: { CODEVIDEO_TTS_CACHE_DIR: path.join(temp, "tts") } });
+    assert.equal(cached.env.CODEVIDEO_TTS_CACHE_DIR, path.join(temp, "tts"));
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }

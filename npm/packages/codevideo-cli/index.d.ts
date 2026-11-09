@@ -11,6 +11,7 @@ export interface CodeVideoCliRuntime {
   runnerPath: string;
   workDir: string;
   logDir: string;
+  ttsCacheDir: string;
   outputDir: string;
   env: NodeJS.ProcessEnv;
 }

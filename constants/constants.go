@@ -73,6 +73,16 @@ func OutputFolder() string {
 	return executableDir()
 }
 
+// TTSCacheFolder keeps ElevenLabs narration clips when there's no S3 bucket,
+// so rendering a lesson again reuses them instead of paying for them again.
+// The npm launcher puts it in ~/.cache/codevideo/tts, next to the logs.
+func TTSCacheFolder() string {
+	if configured := absoluteEnvPath("CODEVIDEO_TTS_CACHE_DIR"); configured != "" {
+		return configured
+	}
+	return filepath.Join(WorkFolder(), "tts")
+}
+
 // MaxConcurrentJobs returns the worker concurrency limit. It is overridable at
 // runtime via the CODEVIDEO_MAX_CONCURRENT_JOBS env var (a positive integer);
 // otherwise it falls back to MAX_CONCURRENT_JOBS.

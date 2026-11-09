@@ -18,7 +18,6 @@ import (
 	"github.com/codevideo/codevideo-cli/cli/progress"
 	"github.com/codevideo/codevideo-cli/cloud"
 	"github.com/codevideo/codevideo-cli/constants"
-	"github.com/codevideo/codevideo-cli/elevenlabs"
 	"github.com/codevideo/codevideo-cli/types"
 	"github.com/codevideo/codevideo-cli/utils"
 	"github.com/google/uuid"
@@ -168,30 +167,37 @@ func generateAudioItems(ctx context.Context, actions []types.Action) ([]types.Au
 	job.Begin(progress.Narration)
 	var audioManifest []types.AudioItem
 
-	// Provider switch: "elevenlabs" (default, cloud + S3) or "kokoro" (self-hosted
-	// codevideo-tts service, embedded as a data URI — no S3/cloud account needed).
+	// Provider switch: "elevenlabs" (default) or "kokoro" (self-hosted
+	// codevideo-tts service, embedded as a data URI). ElevenLabs clips go to S3
+	// when keys are set, and are embedded as data URIs too when they aren't.
 	provider := strings.ToLower(strings.TrimSpace(os.Getenv("CODEVIDEO_TTS_PROVIDER")))
 	if provider == "" {
 		provider = "elevenlabs"
 	}
 	ttsApiKey := os.Getenv("ELEVEN_LABS_API_KEY")
 	ttsVoiceId := resolveTTSVoiceID()
+	s3 := cloud.ConfigFromEnv()
+	cache := ttsCacheFromEnv()
 	if provider == "elevenlabs" {
 		if ttsVoiceId == "" {
 			log.Info("No explicit ElevenLabs voice ID found in env; ElevenLabs client default voice will be used")
 		} else {
 			log.Debug("Using ElevenLabs voice ID from environment")
 		}
+		if s3.Enabled() {
+			log.Infof("ElevenLabs clips go to the %s S3 bucket", s3.Bucket)
+		} else {
+			log.Info("No S3 keys set: ElevenLabs clips are embedded in the job (no upload)")
+		}
 	} else {
 		log.Infof("Using self-hosted TTS provider %q (audio embedded as data URI, no S3)", provider)
 	}
+	reusedClips := 0
 
 	for i, action := range actions {
 		textToSpeak := action.Value
-		// Include voice ID in the hash so changing voices always generates new audio objects.
-		textHash := utils.Sha256Hash(fmt.Sprintf("%s::%s", ttsVoiceId, textToSpeak))
 		if strings.HasPrefix(action.Name, "author-speak") {
-			log.Debugf("Converting text at step index %d to audio... (hash is %s)", i, textHash)
+			log.Debugf("Converting text at step index %d to audio...", i)
 			var mp3Url string
 			var audioData []byte
 			var err error
@@ -202,13 +208,13 @@ func generateAudioItems(ctx context.Context, actions []types.Action) ([]types.Au
 				}
 				mp3Url = "data:audio/mpeg;base64," + base64.StdEncoding.EncodeToString(audioData)
 			} else {
-				audioData, err = elevenlabs.GetAudioArrayBufferElevenLabs(ctx, textToSpeak, ttsApiKey, ttsVoiceId)
+				var reused bool
+				audioData, mp3Url, reused, err = elevenLabsClip(ctx, textToSpeak, ttsApiKey, ttsVoiceId, s3, cache)
 				if err != nil {
-					return nil, fmt.Errorf("error converting text to audio: %w", err)
+					return nil, err
 				}
-				mp3Url, err = cloud.UploadFileToS3(ctx, audioData, "v3/audio", fmt.Sprintf("%s.mp3", textHash))
-				if err != nil {
-					return nil, fmt.Errorf("error uploading audio to S3: %w", err)
+				if reused {
+					reusedClips++
 				}
 			}
 			audioManifest = append(audioManifest, types.AudioItem{
@@ -218,6 +224,9 @@ func generateAudioItems(ctx context.Context, actions []types.Action) ([]types.Au
 		}
 	}
 
+	if reusedClips > 0 {
+		log.Infof("Reused %d of %d narration clips made before, instead of calling ElevenLabs", reusedClips, clips)
+	}
 	log.Debug("Done with audio conversion")
 
 	return audioManifest, nil

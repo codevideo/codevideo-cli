@@ -67,6 +67,8 @@ export function resolveCodeVideoCliRuntime(options = {}) {
   const cacheRoot = path.join(os.homedir(), ".cache", "codevideo");
   const workDir = path.resolve(env.CODEVIDEO_WORK_DIR || path.join(os.tmpdir(), "codevideo", "v3"));
   const logDir = path.resolve(env.CODEVIDEO_LOG_DIR || path.join(cacheRoot, "logs"));
+  // Narration clips are kept for reuse, so they belong with the logs, not in the temp work folder.
+  const ttsCacheDir = path.resolve(env.CODEVIDEO_TTS_CACHE_DIR || path.join(cacheRoot, "tts"));
   const outputDir = path.resolve(env.CODEVIDEO_OUTPUT_DIR || process.cwd());
 
   return {
@@ -74,12 +76,14 @@ export function resolveCodeVideoCliRuntime(options = {}) {
     runnerPath,
     workDir,
     logDir,
+    ttsCacheDir,
     outputDir,
     env: {
       ...env,
       CODEVIDEO_PUPPETEER_RUNNER_PATH: runnerPath,
       CODEVIDEO_WORK_DIR: workDir,
       CODEVIDEO_LOG_DIR: logDir,
+      CODEVIDEO_TTS_CACHE_DIR: ttsCacheDir,
       CODEVIDEO_OUTPUT_DIR: outputDir
     }
   };
