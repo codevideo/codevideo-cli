@@ -190,12 +190,27 @@ func processManifest(ctx context.Context, g *generator.Generator, manifest *type
 }
 
 // readProject returns the project JSON from -p, or from the file that
-// --project-file names. A file has no size limit; one argument does (128 KiB
-// on Linux, and about 32K characters for a whole Windows command line).
+// --project-file names. If -p refers to an existing file, it is read directly.
+// A file has no size limit; one argument does (128 KiB on Linux, and about 32K
+// characters for a whole Windows command line).
 func readProject(cmd *cobra.Command) (string, error) {
 	path, _ := cmd.Flags().GetString("project-file")
 	if path == "" {
 		project, _ := cmd.Flags().GetString("project")
+		if project == "" {
+			return "", nil
+		}
+		// If -p is a path to an existing file, read the file contents directly!
+		if info, err := os.Stat(project); err == nil && !info.IsDir() {
+			data, err := os.ReadFile(project)
+			if err != nil {
+				return "", fmt.Errorf("reading project file %s: %w", project, err)
+			}
+			if strings.TrimSpace(string(data)) == "" {
+				return "", fmt.Errorf("project file %s is empty", project)
+			}
+			return string(data), nil
+		}
 		return project, nil
 	}
 	data, err := os.ReadFile(path)

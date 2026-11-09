@@ -192,10 +192,10 @@ func addFlags(cmd *cobra.Command) {
 	// --mode or -m flag for running in server mode
 	cmd.Flags().StringP("mode", "m", "", "Run mode (use 'serve' for file watcher mode)")
 
-	// --project or -p flag for specifying project JSON data, or --project-file
+	// --project or -p flag for specifying project JSON data, or --project-file (-f)
 	// for a file of it: one argument is capped at 128 KiB on Linux
-	cmd.Flags().StringP("project", "p", "", "Project data (Actions, Lesson, or Course) in JSON format")
-	cmd.Flags().String("project-file", "", "Read the project data (Actions, Lesson, or Course) from this JSON file")
+	cmd.Flags().StringP("project", "p", "", "Project data (Actions, Lesson, or Course) in JSON format or path to JSON file")
+	cmd.Flags().StringP("project-file", "f", "", "Read the project data (Actions, Lesson, or Course) from this JSON file")
 	cmd.MarkFlagsMutuallyExclusive("project", "project-file")
 
 	// --output or -o flag for specifying output file path
@@ -244,9 +244,11 @@ func main() {
 		if err := godotenv.Load(configured); err != nil {
 			log.Warnf("failed to load CODEVIDEO_ENV_FILE %s: %v", configured, err)
 		}
-	} else if err := godotenv.Load(filepath.Join(execDir, ".env")); err != nil {
-		// Preserve the source-install fallback without warning for npm installs.
-		_ = godotenv.Load(filepath.Join(execDir, ".env.example"))
+	} else if err := godotenv.Load(".env"); err != nil {
+		if err := godotenv.Load(filepath.Join(execDir, ".env")); err != nil {
+			// Preserve the source-install fallback without warning for npm installs.
+			_ = godotenv.Load(filepath.Join(execDir, ".env.example"))
+		}
 	}
 
 	// Execute the root command; cobra prints its own errors (unknown flags)
