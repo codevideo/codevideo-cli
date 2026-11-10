@@ -64,17 +64,36 @@ func ActionDurationsMs(actions []types.Action, o Options) []float64 {
 		o.StandardPauseMs = DefaultStandardPauseMs
 	}
 	durations := make([]float64, len(actions))
+	// author-speak-during keeps talking while the next actions play, and every
+	// speak action first waits for it to finish, so voices never overlap.
+	elapsedMs, speechEndsAtMs := 0.0, 0.0
 	for i, action := range actions {
 		// Every action first waits a standard pause so the DOM can settle.
 		ms := o.StandardPauseMs
-		times := 1
-		if repeatable[action.Name] {
-			times, _ = parseInt(action.Value)
-		}
-		for r := 0; r < times; r++ {
-			ms += perRunMs(action, i, o)
+		if speech[action.Name] {
+			ms += max(0, speechEndsAtMs-(elapsedMs+ms))
+			speechMs := speechLengthMs(action, i, o)
+			if action.Name == "author-speak-during" {
+				speechEndsAtMs = elapsedMs + ms + speechMs
+			} else {
+				ms += speechMs
+			}
+		} else {
+			times := 1
+			if repeatable[action.Name] {
+				times, _ = parseInt(action.Value)
+			}
+			for r := 0; r < times; r++ {
+				ms += perRunMs(action, o)
+			}
 		}
 		durations[i] = ms
+		elapsedMs += ms
+	}
+	// Narration still playing after the last action counts in the last action,
+	// so the durations still add up to the video's length.
+	if len(durations) > 0 && speechEndsAtMs > elapsedMs {
+		durations[len(durations)-1] += speechEndsAtMs - elapsedMs
 	}
 	return durations
 }
@@ -88,14 +107,20 @@ func TotalMs(actions []types.Action, o Options) float64 {
 	return total
 }
 
-func perRunMs(action types.Action, index int, o Options) float64 {
+var speech = map[string]bool{"author-speak-before": true, "author-speak-after": true, "author-speak-during": true}
+
+// speechLengthMs is how long a narration clip plays: measured if known,
+// otherwise from its word count.
+func speechLengthMs(action types.Action, index int, o Options) float64 {
+	if ms, ok := o.SpeechMs[index]; ok && ms > 0 {
+		return ms
+	}
+	return float64(len(strings.Fields(action.Value))) / wordsPerSecond * 1000
+}
+
+func perRunMs(action types.Action, o Options) float64 {
 	name := action.Name
 	switch {
-	case name == "author-speak-before" || name == "author-speak-after":
-		if ms, ok := o.SpeechMs[index]; ok && ms > 0 {
-			return ms
-		}
-		return float64(len(strings.Fields(action.Value))) / wordsPerSecond * 1000
 	case name == "author-wait":
 		if ms, ok := parseInt(action.Value); ok && ms > 0 {
 			return float64(ms)
@@ -113,8 +138,8 @@ func perRunMs(action types.Action, index int, o Options) float64 {
 	case strings.HasPrefix(name, "mouse-move-"):
 		return o.StandardPauseMs + mouseMovePaddingMs
 	}
-	// author-speak-during, file explorer typing (not awaited in realtime),
-	// clicks, slides and external pages add nothing beyond the base pause.
+	// File explorer typing (not awaited in realtime), clicks, slides and
+	// external pages add nothing beyond the base pause.
 	return 0
 }
 

@@ -45,6 +45,17 @@
         { "name": "clipboard-clear", "value": "1" }
       ],
       "expectedMs": [1000, 1050, 1100, 1150, 1000]
+    },
+    {
+      "name": "speech waits for a speak-during that is still playing; one still playing at the end adds its tail to the last action",
+      "options": { "keyboardTypingPauseMs": 10, "standardPauseMs": 100, "speechMs": { "0": 3000, "2": 1000, "3": 2000 } },
+      "actions": [
+        { "name": "author-speak-during", "value": "Talking while typing." },
+        { "name": "editor-type", "value": "abcde" },
+        { "name": "author-speak-before", "value": "Waits for the first." },
+        { "name": "author-speak-during", "value": "Still talking at the end." }
+      ],
+      "expectedMs": [100, 150, 3850, 2100]
     }
   ]
 }
