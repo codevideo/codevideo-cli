@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -91,6 +92,55 @@ func TestLastLinesKeepsTheEndOfStderr(t *testing.T) {
 
 // Chrome's MediaRecorder webm has no duration in its header, like this
 // ffmpeg-made file streamed without seeking back to write one.
+// The video starts where the first action does: -ss goes before -i, and a
+// recording kept whole gets no -ss at all.
+func TestMp4ArgsStartWhereAsked(t *testing.T) {
+	args := strings.Join(mp4Args("in.webm", "out.mp4", 2140*time.Millisecond), " ")
+	if !strings.Contains(args, "-ss 2.140 -i in.webm") {
+		t.Fatalf("args = %s, want -ss 2.140 right before -i", args)
+	}
+	if args := strings.Join(mp4Args("in.webm", "out.mp4", 0), " "); strings.Contains(args, "-ss") {
+		t.Fatalf("args = %s, want no -ss", args)
+	}
+}
+
+// A 3 s recording with a 1 s lead-in becomes a 2 s video with its sound.
+func TestConvertToMp4TrimsTheLeadIn(t *testing.T) {
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		t.Skip("ffmpeg required")
+	}
+	probe, err := ResolveFFprobePath()
+	if err != nil {
+		t.Skip("ffprobe required")
+	}
+	dir := t.TempDir()
+	webm := filepath.Join(dir, "recording.webm")
+	var stderr strings.Builder
+	command := exec.Command(ffmpeg, "-v", "error",
+		"-f", "lavfi", "-i", "testsrc=size=320x180:rate=60:duration=3",
+		"-f", "lavfi", "-i", "sine=frequency=440:duration=3",
+		"-c:v", "libvpx", "-c:a", "libopus", "-f", "webm", webm)
+	command.Stderr = &stderr
+	if err := command.Run(); err != nil {
+		t.Skipf("no libvpx/libopus encoder: %v %s", err, stderr.String())
+	}
+	mp4 := filepath.Join(dir, "video.mp4")
+	if err := ConvertToMp4(context.Background(), webm, mp4, time.Second); err != nil {
+		t.Fatal(err)
+	}
+	for _, stream := range []string{"v:0", "a:0"} {
+		output, err := exec.Command(probe, "-v", "error", "-select_streams", stream, "-show_entries", "stream=duration", "-of", "csv=p=0", mp4).Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		seconds, err := strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
+		if err != nil || seconds < 1.9 || seconds > 2.1 {
+			t.Fatalf("%s duration = %q, want about 2s", stream, output)
+		}
+	}
+}
+
 func TestMediaSecondsReadsHeaderlessWebm(t *testing.T) {
 	ffmpeg, err := exec.LookPath("ffmpeg")
 	if err != nil {
@@ -140,7 +190,7 @@ func TestConvertToMp4StopsWhenCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 	started := time.Now()
-	err := ConvertToMp4(ctx, input, filepath.Join(dir, "video.mp4"))
+	err := ConvertToMp4(ctx, input, filepath.Join(dir, "video.mp4"), 0)
 	if err == nil || !strings.Contains(err.Error(), "signal: interrupt") {
 		t.Fatalf("err = %v, want ffmpeg stopped by an interrupt", err)
 	}

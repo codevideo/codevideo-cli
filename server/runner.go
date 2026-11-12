@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/codevideo/codevideo-cli/cli/progress"
 	log "github.com/sirupsen/logrus"
@@ -23,6 +24,15 @@ type runnerEvent struct {
 	Frame  int    `json:"frame"`  // planning: frames evaluated; frames: frames captured
 	Frames int    `json:"frames"` // frames: frames to capture
 	Error  string `json:"error"`  // the runner failed with this message
+	// closing: how long the realtime recording idled before its first action
+	LeadInMs *float64 `json:"leadInMs"`
+}
+
+// runnerResult is what a runner reported besides its progress.
+type runnerResult struct {
+	// LeadIn is how long a realtime recording opens on a still editor before
+	// its first action starts, or 0 when the runner didn't say.
+	LeadIn time.Duration
 }
 
 func parseRunnerEvent(line string) (runnerEvent, bool) {
@@ -63,17 +73,21 @@ type runnerOutput struct {
 	mu      sync.Mutex
 	failure string
 	tail    []string
+	result  runnerResult
 }
 
 const tailLines = 5
 
 func (o *runnerOutput) stdoutLine(line string) {
 	if event, ok := parseRunnerEvent(line); ok {
+		o.mu.Lock()
 		if event.Error != "" {
-			o.mu.Lock()
 			o.failure = event.Error
-			o.mu.Unlock()
 		}
+		if event.LeadInMs != nil && *event.LeadInMs > 0 {
+			o.result.LeadIn = time.Duration(*event.LeadInMs * float64(time.Millisecond))
+		}
+		o.mu.Unlock()
 		event.apply(o.job)
 		return
 	}
@@ -106,8 +120,9 @@ func (o *runnerOutput) explain(err error) error {
 }
 
 // runRunner runs a Node runner to completion, feeding its progress lines to
-// job and logging the rest at debug level.
-func runRunner(cmd *exec.Cmd, name string, job *progress.Job) error {
+// job and logging the rest at debug level. It returns what the runner reported
+// besides progress.
+func runRunner(cmd *exec.Cmd, name string, job *progress.Job) (runnerResult, error) {
 	output := &runnerOutput{job: job, name: name}
 	stdout := &lineWriter{line: output.stdoutLine}
 	stderr := &lineWriter{line: output.stderrLine}
@@ -116,9 +131,9 @@ func runRunner(cmd *exec.Cmd, name string, job *progress.Job) error {
 	stdout.flush()
 	stderr.flush()
 	if err != nil {
-		return output.explain(err)
+		return runnerResult{}, output.explain(err)
 	}
-	return nil
+	return output.result, nil
 }
 
 // lineWriter calls line for each complete line written to it. exec.Cmd copies

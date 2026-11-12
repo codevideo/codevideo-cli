@@ -176,15 +176,17 @@ func processJob(ctx context.Context, manifestPath string, mode string, outputPat
 		}
 	} else {
 		// Call the Puppeteer script using node with the uuid and explicit output path.
-		if err := RunPuppeteerForUUID(ctx, uuid, manifestPath, webmPath, jobOrientation(manifest)); err != nil {
+		leadIn, err := RunPuppeteerForUUID(ctx, uuid, manifestPath, webmPath, jobOrientation(manifest))
+		if err != nil {
 			log.Printf("Puppeteer recording failed for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, "Puppeteer recording failed")
 			return "", fmt.Errorf("recording failed: %w", err)
 		}
 
-		// Puppeteer succeeded, now convert to mp4
-		log.Debugf("Converting webm to mp4 for job %s", uuid)
-		if err := utils.ConvertToMp4(ctx, webmPath, mp4Path); err != nil {
+		// Puppeteer succeeded, now convert to mp4, starting where the first
+		// action does: before it the recording shows a still editor.
+		log.Debugf("Converting webm to mp4 for job %s (lead-in %v)", uuid, leadIn)
+		if err := utils.ConvertToMp4(ctx, webmPath, mp4Path, leadIn); err != nil {
 			log.Printf("Failed to convert webm to mp4 for job %s: %v", uuid, err)
 			utils.AddErrorToManifest(manifestPath, fmt.Sprintf("Failed to convert video: %v", err))
 			return "", fmt.Errorf("converting to mp4 failed: %w", err)
@@ -390,10 +392,12 @@ func manifestActions(manifest *types.CodeVideoManifest) []types.Action {
 	return manifest.Lesson.Actions
 }
 
-// RunPuppeteerForUUID records the job's webm. The runner's progress lines go
-// to the CLI's current job and the rest of its output to the debug log.
-// Cancelling ctx interrupts the runner, which closes Chrome and exits.
-func RunPuppeteerForUUID(ctx context.Context, uuid string, manifestPath string, webmOutputPath string, orientation string) error {
+// RunPuppeteerForUUID records the job's webm and returns how long it idles
+// before the first action starts (0 if the render page didn't report it). The
+// runner's progress lines go to the CLI's current job and the rest of its
+// output to the debug log. Cancelling ctx interrupts the runner, which closes
+// Chrome and exits.
+func RunPuppeteerForUUID(ctx context.Context, uuid string, manifestPath string, webmOutputPath string, orientation string) (time.Duration, error) {
 	// Access the global configuration
 	resolution := config.GlobalConfig.Resolution
 
@@ -401,7 +405,7 @@ func RunPuppeteerForUUID(ctx context.Context, uuid string, manifestPath string, 
 
 	// Check if the script exists
 	if _, err := os.Stat(nodeScriptPath); err != nil {
-		return fmt.Errorf("node script is unavailable at %s: %w", nodeScriptPath, err)
+		return 0, fmt.Errorf("node script is unavailable at %s: %w", nodeScriptPath, err)
 	}
 
 	log.Debugf("Using node script at: %s", nodeScriptPath)
@@ -419,5 +423,6 @@ func RunPuppeteerForUUID(ctx context.Context, uuid string, manifestPath string, 
 		cmd.Args = append(cmd.Args, "--debug")
 	}
 
-	return runRunner(cmd, "Puppeteer", progress.Current())
+	result, err := runRunner(cmd, "Puppeteer", progress.Current())
+	return result.LeadIn, err
 }

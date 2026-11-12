@@ -93,7 +93,7 @@ func processDeterministicJob(ctx context.Context, manifestPath string, manifest 
 	// before it is killed.
 	command := utils.CommandContext(ctx, "node", args...)
 	job := progress.Current()
-	if err := runRunner(command, "Deterministic renderer", job); err != nil {
+	if _, err := runRunner(command, "Deterministic renderer", job); err != nil {
 		return fmt.Errorf("deterministic renderer failed: %w", err)
 	}
 	var trace types.RenderTrace

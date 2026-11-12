@@ -43,7 +43,7 @@ func TestRunRunnerExplainsFailures(t *testing.T) {
 	job := progress.NewJob("")
 	job.PlanDeterministic([]float64{1000}, 1)
 	script := `echo 'CODEVIDEO_PROGRESS {"stage":"frames","frame":30,"frames":180}'; echo chatter; echo 'first problem' >&2; printf 'last problem' >&2; exit 3`
-	err := runRunner(exec.Command("sh", "-c", script), "Test runner", job)
+	_, err := runRunner(exec.Command("sh", "-c", script), "Test runner", job)
 	if err == nil || !strings.HasSuffix(err.Error(), "exit status 3: first problem | last problem") {
 		t.Fatalf("err = %v", err)
 	}
@@ -53,12 +53,34 @@ func TestRunRunnerExplainsFailures(t *testing.T) {
 
 	// The runner's own error message wins over stderr noise such as Chrome's.
 	script = `echo 'Chrome noise' >&2; echo 'CODEVIDEO_PROGRESS {"error":"Failed to launch the browser process"}'; exit 1`
-	err = runRunner(exec.Command("sh", "-c", script), "Test runner", nil)
+	_, err = runRunner(exec.Command("sh", "-c", script), "Test runner", nil)
 	if err == nil || !strings.HasSuffix(err.Error(), "exit status 1: Failed to launch the browser process") {
 		t.Fatalf("err = %v", err)
 	}
-	if err := runRunner(exec.Command("sh", "-c", "echo fine"), "Test runner", nil); err != nil {
+	if _, err := runRunner(exec.Command("sh", "-c", "echo fine"), "Test runner", nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The recorder reports how long its recording idles before the first action,
+// so the conversion can start the video there.
+func TestRunRunnerReturnsTheRecordingsLeadIn(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh")
+	}
+	script := `echo 'CODEVIDEO_PROGRESS {"stage":"recording","action":0}'; echo 'CODEVIDEO_PROGRESS {"stage":"closing","leadInMs":2140}'`
+	result, err := runRunner(exec.Command("sh", "-c", script), "Test runner", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.LeadIn != 2140*time.Millisecond {
+		t.Fatalf("lead-in = %v, want 2.14s", result.LeadIn)
+	}
+
+	// A render page that reports no action boundaries: nothing to trim.
+	result, err = runRunner(exec.Command("sh", "-c", `echo 'CODEVIDEO_PROGRESS {"stage":"closing"}'`), "Test runner", nil)
+	if err != nil || result.LeadIn != 0 {
+		t.Fatalf("lead-in = %v, err = %v; want 0 and no error", result.LeadIn, err)
 	}
 }
 

@@ -17,12 +17,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// ConvertToMp4 converts a given input file to an MP4 file with the specified output filename.
-// It constructs the ffmpeg command with options to overwrite output (-y), use the input (-i),
-// set the video codec, preset, quality level, frame rate, audio codec, and audio bitrate.
+// ConvertToMp4 converts a given input file to an MP4 file with the specified output filename,
+// starting start into the input (0 keeps all of it). It constructs the ffmpeg command with
+// options to overwrite output (-y), use the input (-i), set the video codec, preset, quality
+// level, frame rate, audio codec, and audio bitrate.
 // Progress goes to the CLI's current job, if there is one. Cancelling ctx
 // interrupts ffmpeg.
-func ConvertToMp4(ctx context.Context, input, output string) error {
+func ConvertToMp4(ctx context.Context, input, output string, start time.Duration) error {
 	job := progress.Current()
 	job.Begin(progress.Encoding)
 
@@ -55,35 +56,29 @@ func ConvertToMp4(ctx context.Context, input, output string) error {
 		return err
 	}
 
-	// Construct the ffmpeg command with the -progress flag.
-	cmd := CommandContext(ctx, ffmpegPath,
-		"-y",           // Overwrite output if exists
-		"-hide_banner", // No build information on stderr
-		"-nostats",     // Progress comes from -progress, not the stderr stats line
-		"-i", inputAbs, // Input file (absolute path)
-		"-c:v", "libx264", // Video codec
-		"-preset", "fast", // Encoding preset
-		"-crf", "18", // Quality level
-		"-r", "60", // Frame rate
-		"-c:a", "aac", // Audio codec
-		"-b:a", "384k", // Audio bitrate
-		"-progress", "pipe:1", // Send progress info to stdout
-		outputAbs, // Output file (absolute path)
-	)
-
-	log.Debugf("Executing command: %s", cmd.String())
-
 	// The recording's length. Chrome's webm files have no duration in their
 	// header, so read the last packet timestamp, or else use how long the
-	// recording ran. Only the CLI's progress bar needs it.
+	// recording ran. The progress bar needs it, and it bounds start.
 	duration := job.RecordedSeconds()
-	if job != nil {
+	if job != nil || start > 0 {
 		if seconds, err := mediaSeconds(ctx, inputAbs); err == nil {
 			duration = seconds
 		} else {
 			log.Debugf("Could not read the recording's length: %v", err)
 		}
 	}
+	if start > 0 && duration > 0 && start.Seconds() >= duration {
+		log.Debugf("Keeping the whole recording: it is %.1fs long, shorter than the %v lead-in", duration, start)
+		start = 0
+	}
+	if start > 0 {
+		duration -= start.Seconds()
+	}
+
+	// Construct the ffmpeg command with the -progress flag.
+	cmd := CommandContext(ctx, ffmpegPath, mp4Args(inputAbs, outputAbs, start)...)
+
+	log.Debugf("Executing command: %s", cmd.String())
 
 	// Get a pipe to read ffmpeg's stdout.
 	stdoutPipe, err := cmd.StdoutPipe()
@@ -119,6 +114,31 @@ func ConvertToMp4(ctx context.Context, input, output string) error {
 		log.Debugf("ffmpeg stderr:\n%s", stderr.String())
 	}
 	return nil
+}
+
+// mp4Args is the ffmpeg command line that encodes input to output, starting
+// start into the input.
+func mp4Args(input, output string, start time.Duration) []string {
+	args := []string{
+		"-y",           // Overwrite output if exists
+		"-hide_banner", // No build information on stderr
+		"-nostats",     // Progress comes from -progress, not the stderr stats line
+	}
+	if start > 0 {
+		// Seeking before -i is fast, and exact here because the video is re-encoded.
+		args = append(args, "-ss", strconv.FormatFloat(start.Seconds(), 'f', 3, 64))
+	}
+	return append(args,
+		"-i", input, // Input file (absolute path)
+		"-c:v", "libx264", // Video codec
+		"-preset", "fast", // Encoding preset
+		"-crf", "18", // Quality level
+		"-r", "60", // Frame rate
+		"-c:a", "aac", // Audio codec
+		"-b:a", "384k", // Audio bitrate
+		"-progress", "pipe:1", // Send progress info to stdout
+		output, // Output file (absolute path)
+	)
 }
 
 // mediaSeconds returns the last video timestamp in a file by listing packet

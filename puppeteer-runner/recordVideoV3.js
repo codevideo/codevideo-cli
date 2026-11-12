@@ -212,6 +212,8 @@ async function recordVideoV3() {
         videoConstraints
     });
     stream.pipe(file);
+    // Render events carry the page's clock, so note where the recording starts on it.
+    const recordingStartedAt = await page.evaluate(() => performance.now());
     console.log("Recording started");
     reportProgress({ stage: "recording" });
 
@@ -226,6 +228,16 @@ async function recordVideoV3() {
 
     // Wait until the client sends a final progress update.
     await finalProgressPromise;
+
+    // The recording idles until the first action starts (the pre-roll above and
+    // the player's intro hold); the CLI trims that off. A render page that
+    // reports no action boundaries leaves the recording as it is.
+    const leadInMs = await page.evaluate(startedAt => {
+        const drain = window.__drainCodeVideoRenderEvents;
+        const starts = (typeof drain === 'function' ? drain() : []).filter(event => event.type === 'action-start');
+        return starts.length ? Math.min(...starts.map(event => event.timestampMs)) - startedAt : null;
+    }, recordingStartedAt);
+    console.log("Lead-in before the first action (ms):", leadInMs);
 
     // Wait a moment before stopping the recording.
     await sleep(1000);
@@ -242,7 +254,7 @@ async function recordVideoV3() {
     await stream.destroy();
     file.close();
     console.log("Recording finished");
-    reportProgress({ stage: "closing" });
+    reportProgress(leadInMs > 0 ? { stage: "closing", leadInMs: Math.round(leadInMs) } : { stage: "closing" });
 
     await browser.close();
     (await wss).close();
