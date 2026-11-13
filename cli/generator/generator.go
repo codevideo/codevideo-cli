@@ -32,6 +32,9 @@ type Generator struct {
 	Environment    string
 	UserID         string
 	IDEProps       *types.CodeVideoIDEProps
+	// AudioTakes are narration clips made before the render, keyed by their
+	// text. A narrated line with a take is not generated again.
+	AudioTakes map[string]AudioTake
 	// BeforeLesson, if set, runs before each lesson of a course is narrated.
 	BeforeLesson func(index int)
 }
@@ -73,7 +76,7 @@ func (g *Generator) GenerateFromActions(ctx context.Context, actions []types.Act
 	}
 	log.Debugf("Processing video job %s with %d actions", uuid, len(actions))
 
-	audioItems, err := generateAudioItems(ctx, actions)
+	audioItems, err := generateAudioItems(ctx, actions, g.AudioTakes)
 	if err != nil {
 		return nil, fmt.Errorf("error generating audio items: %w", err)
 	}
@@ -91,7 +94,7 @@ func (g *Generator) GenerateFromActions(ctx context.Context, actions []types.Act
 
 // GenerateFromLesson creates a manifest from a lesson
 func (g *Generator) GenerateFromLesson(ctx context.Context, lesson types.Lesson) (*types.CodeVideoManifest, error) {
-	audioItems, err := generateAudioItems(ctx, lesson.Actions)
+	audioItems, err := generateAudioItems(ctx, lesson.Actions, g.AudioTakes)
 	if err != nil {
 		return nil, fmt.Errorf("error generating audio items: %w", err)
 	}
@@ -154,13 +157,20 @@ func (g *Generator) SaveManifest(manifest *types.CodeVideoManifest) (string, err
 	return filePath, nil
 }
 
-// generateAudioItems processes the given actions. For each action whose name starts with
-// "author-speak", it converts the text to audio via ElevenLabs and uploads the audio file to S3.
+// generateAudioItems processes the given actions. Each action whose name starts with
+// "author-speak" uses its take when one has the same text; otherwise its text is
+// converted to audio by the TTS provider (ElevenLabs uploads to S3 when keys are set).
 // Each clip's measured length goes to the CLI's job, which sharpens the recording estimate.
-func generateAudioItems(ctx context.Context, actions []types.Action) ([]types.AudioItem, error) {
+func generateAudioItems(ctx context.Context, actions []types.Action, takes map[string]AudioTake) ([]types.AudioItem, error) {
 	clips := CountSpeech(actions)
 	if clips == 0 {
 		return nil, nil
+	}
+	toGenerate := 0
+	for _, action := range actions {
+		if _, ok := takes[action.Value]; strings.HasPrefix(action.Name, "author-speak") && !ok {
+			toGenerate++
+		}
 	}
 	job := progress.Current()
 	job.PlanNarration(clips)
@@ -178,7 +188,9 @@ func generateAudioItems(ctx context.Context, actions []types.Action) ([]types.Au
 	ttsVoiceId := resolveTTSVoiceID()
 	s3 := cloud.ConfigFromEnv()
 	cache := ttsCacheFromEnv()
-	if provider == "elevenlabs" {
+	if toGenerate == 0 {
+		log.Infof("Using the %d narration takes provided; no speech is generated", clips)
+	} else if provider == "elevenlabs" {
 		if ttsVoiceId == "" {
 			log.Info("No explicit ElevenLabs voice ID found in env; ElevenLabs client default voice will be used")
 		} else {
@@ -192,7 +204,7 @@ func generateAudioItems(ctx context.Context, actions []types.Action) ([]types.Au
 	} else {
 		log.Infof("Using self-hosted TTS provider %q (audio embedded as data URI, no S3)", provider)
 	}
-	reusedClips := 0
+	reusedClips, providedClips := 0, 0
 
 	for i, action := range actions {
 		textToSpeak := action.Value
@@ -201,7 +213,13 @@ func generateAudioItems(ctx context.Context, actions []types.Action) ([]types.Au
 			var mp3Url string
 			var audioData []byte
 			var err error
-			if provider == "kokoro" {
+			if take, ok := takes[textToSpeak]; ok {
+				mp3Url, audioData, err = take.resolve()
+				if err != nil {
+					return nil, err
+				}
+				providedClips++
+			} else if provider == "kokoro" {
 				audioData, err = getAudioFromKokoro(ctx, textToSpeak)
 				if err != nil {
 					return nil, fmt.Errorf("error converting text to audio via kokoro: %w", err)
@@ -224,6 +242,9 @@ func generateAudioItems(ctx context.Context, actions []types.Action) ([]types.Au
 		}
 	}
 
+	if providedClips > 0 && toGenerate > 0 {
+		log.Infof("Used %d provided narration takes and generated %d clips", providedClips, toGenerate)
+	}
 	if reusedClips > 0 {
 		log.Infof("Reused %d of %d narration clips made before, instead of calling ElevenLabs", reusedClips, clips)
 	}

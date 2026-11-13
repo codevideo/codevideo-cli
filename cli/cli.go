@@ -58,6 +58,15 @@ func Execute(cmd *cobra.Command) error {
 		log.Infof("Loaded config from: %s", config.GlobalConfig.ConfigFilePath)
 	}
 
+	var takes map[string]generator.AudioTake
+	if takesPath, _ := cmd.Flags().GetString("audio-items"); takesPath != "" {
+		takes, err = generator.LoadAudioTakes(takesPath)
+		if err != nil {
+			return err
+		}
+		log.Infof("Loaded %d narration takes from: %s", len(takes), takesPath)
+	}
+
 	ctx, stop := cancelOnSignal()
 	defer stop()
 
@@ -72,6 +81,7 @@ func Execute(cmd *cobra.Command) error {
 	generator.RenderSeed = config.GlobalConfig.RenderSeed
 	generator.RenderWorkers = config.GlobalConfig.RenderWorkers
 	generator.RenderStrategy = config.GlobalConfig.RenderStrategy
+	generator.AudioTakes = takes
 	if ideProps != nil {
 		generator.IDEProps = ideProps
 	}

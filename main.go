@@ -198,6 +198,9 @@ func addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("project-file", "f", "", "Read the project data (Actions, Lesson, or Course) from this JSON file")
 	cmd.MarkFlagsMutuallyExclusive("project", "project-file")
 
+	// --audio-items: narration made before the render (e.g. the studio's speech takes)
+	cmd.Flags().String("audio-items", "", `JSON file of narration takes to use instead of generating speech: [{"text": "...", "path": "clip.mp3"}]`)
+
 	// --output or -o flag for specifying output file path
 	cmd.Flags().StringP("output", "o", "", "Output file path")
 

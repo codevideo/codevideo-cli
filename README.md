@@ -138,6 +138,7 @@ By default the CLI shows the progress bar, any warnings or errors, and the saved
 | `--headed` | Show the browser window instead of running it headless (replaces `-d`/`--debug`, which still works with a deprecation notice) |
 | `--slack-webhook-url <url>` | Post progress to a Slack incoming webhook at each stage and every 25% |
 | `--progress json` | Write stderr as one JSON object per line, for programs that run the CLI (default `human`; `--progress=json` works too) |
+| `--audio-items <file>` | Use narration made before the render, such as the studio's speech takes, instead of generating it: a JSON array of `{"text": "...", "path": "clip.mp3"}` (or `"mp3Url"` with a `data:` or `file:` URL). Lines are matched by their exact text; relative paths are read from the file's folder; a line without a take is generated as usual |
 
 The bar, status and log lines go to stderr; the "saved to" line goes to stdout, one per video. When stderr isn't a terminal (CI, pipes, `TERM=dumb`), the bar is replaced by a plain line at each stage and every 25%:
 
