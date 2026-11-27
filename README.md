@@ -59,11 +59,13 @@ Then set up narration in a `.env` file next to the binary (copy `.env.example`),
 - **ElevenLabs:** `ELEVEN_LABS_API_KEY`, and optionally `ELEVEN_LABS_VOICE_ID`. That's all you need: the clips are embedded in the render job. To serve them from your own S3 bucket instead, also set `CODEVIDEO_S3_KEY_ID`, `CODEVIDEO_S3_SECRET`, `CODEVIDEO_S3_BUCKET` and `CODEVIDEO_S3_REGION`. The bucket must allow public reads on `codevideo/v3/audio/`, because the renderer loads each clip from its URL.
 - **Kokoro** (self-hosted, no cloud account): `CODEVIDEO_TTS_PROVIDER=kokoro` and `TTS_SERVICE_URL` pointing at a codevideo-tts service.
 
+To pick the ElevenLabs model, set `ELEVEN_LABS_MODEL_ID`, for example `eleven_v4`, `eleven_v4_turbo`, `eleven_v3`, `eleven_multilingual_v2` or `eleven_flash_v2_5`. Without it, voices keep the model they've always had: `eleven_multilingual_v2`. Eleven v3 and later act out audio tags written in the narration, such as `[whispers] It's a secret.` or `[exaggerated clueless voice] uh, what is odd?`. Captions never show the tags. Other models and Kokoro would read the tags aloud, so the CLI leaves them out of the speech and logs a warning.
+
 ```env
 ELEVEN_LABS_API_KEY=your-elevenlabs-api-key
 ```
 
-ElevenLabs clips are reused whenever the same line is narrated again with the same voice, so rendering a lesson again doesn't pay for its narration twice. With S3 keys the bucket holds them; without, they're kept in `CODEVIDEO_TTS_CACHE_DIR` (by default `tts` in the work folder, or `~/.cache/codevideo/tts` through npm). Set `CODEVIDEO_TTS_CACHE=off` for a fresh take of every clip.
+ElevenLabs clips are reused whenever the same line is narrated again with the same voice and model, so rendering a lesson again doesn't pay for its narration twice. With S3 keys the bucket holds them; without, they're kept in `CODEVIDEO_TTS_CACHE_DIR` (by default `tts` in the work folder, or `~/.cache/codevideo/tts` through npm). Set `CODEVIDEO_TTS_CACHE=off` for a fresh take of every clip.
 
 You should be ready to start using the CodeVideo CLI!
 

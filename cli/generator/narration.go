@@ -51,8 +51,8 @@ func ttsCacheFromEnv() ttsCache {
 //     public URL;
 //   - without them, clips are kept in the TTS cache folder and embedded in the
 //     job as data URIs, so no bucket is needed at all.
-func elevenLabsClip(ctx context.Context, text, apiKey, voiceID string, s3 cloud.Config, cache ttsCache) (audio []byte, url string, reused bool, err error) {
-	key, err := elevenlabs.ClipKey(text, voiceID)
+func elevenLabsClip(ctx context.Context, text, apiKey string, voice elevenlabs.Voice, s3 cloud.Config, cache ttsCache) (audio []byte, url string, reused bool, err error) {
+	key, err := elevenlabs.ClipKey(text, voice)
 	if err != nil {
 		return nil, "", false, err
 	}
@@ -65,7 +65,7 @@ func elevenLabsClip(ctx context.Context, text, apiKey, voiceID string, s3 cloud.
 				return existing, url, true, nil
 			}
 		}
-		if audio, err = elevenLabsAudio(ctx, text, apiKey, voiceID); err != nil {
+		if audio, err = elevenLabsAudio(ctx, text, apiKey, voice); err != nil {
 			return nil, "", false, fmt.Errorf("error converting text to audio: %w", err)
 		}
 		if url, err = uploadClip(ctx, s3, audio, filename); err != nil {
@@ -80,7 +80,7 @@ func elevenLabsClip(ctx context.Context, text, apiKey, voiceID string, s3 cloud.
 			return existing, dataURI(existing), true, nil
 		}
 	}
-	if audio, err = elevenLabsAudio(ctx, text, apiKey, voiceID); err != nil {
+	if audio, err = elevenLabsAudio(ctx, text, apiKey, voice); err != nil {
 		return nil, "", false, fmt.Errorf("error converting text to audio: %w", err)
 	}
 	if cache.enabled {

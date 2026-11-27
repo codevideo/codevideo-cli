@@ -18,6 +18,8 @@ import (
 	"github.com/codevideo/codevideo-cli/cli/progress"
 	"github.com/codevideo/codevideo-cli/cloud"
 	"github.com/codevideo/codevideo-cli/constants"
+	"github.com/codevideo/codevideo-cli/elevenlabs"
+	"github.com/codevideo/codevideo-cli/speech"
 	"github.com/codevideo/codevideo-cli/types"
 	"github.com/codevideo/codevideo-cli/utils"
 	"github.com/google/uuid"
@@ -166,10 +168,13 @@ func generateAudioItems(ctx context.Context, actions []types.Action, takes map[s
 	if clips == 0 {
 		return nil, nil
 	}
-	toGenerate := 0
+	toGenerate, tagged := 0, 0
 	for _, action := range actions {
 		if _, ok := takes[action.Value]; strings.HasPrefix(action.Name, "author-speak") && !ok {
 			toGenerate++
+			if speech.HasTags(action.Value) {
+				tagged++
+			}
 		}
 	}
 	job := progress.Current()
@@ -185,16 +190,20 @@ func generateAudioItems(ctx context.Context, actions []types.Action, takes map[s
 		provider = "elevenlabs"
 	}
 	ttsApiKey := os.Getenv("ELEVEN_LABS_API_KEY")
-	ttsVoiceId := resolveTTSVoiceID()
+	voice := resolveTTSVoice()
 	s3 := cloud.ConfigFromEnv()
 	cache := ttsCacheFromEnv()
 	if toGenerate == 0 {
 		log.Infof("Using the %d narration takes provided; no speech is generated", clips)
 	} else if provider == "elevenlabs" {
-		if ttsVoiceId == "" {
+		if voice.ID == "" {
 			log.Info("No explicit ElevenLabs voice ID found in env; ElevenLabs client default voice will be used")
 		} else {
 			log.Debug("Using ElevenLabs voice ID from environment")
+		}
+		log.Infof("ElevenLabs model: %s", voice.Model())
+		if tagged > 0 && !elevenlabs.ReadsAudioTags(voice.Model()) {
+			log.Warnf("%d narration line(s) have audio tags like [whispers], which %s would read aloud, so they're left out. Set ELEVEN_LABS_MODEL_ID to eleven_v3 or later to have them acted out.", tagged, voice.Model())
 		}
 		if s3.Enabled() {
 			log.Infof("ElevenLabs clips go to the %s S3 bucket", s3.Bucket)
@@ -203,6 +212,9 @@ func generateAudioItems(ctx context.Context, actions []types.Action, takes map[s
 		}
 	} else {
 		log.Infof("Using self-hosted TTS provider %q (audio embedded as data URI, no S3)", provider)
+		if tagged > 0 {
+			log.Warnf("%d narration line(s) have audio tags like [whispers], which the %s voice would read aloud, so they're left out. Only ElevenLabs v3 and later act them out.", tagged, provider)
+		}
 	}
 	reusedClips, providedClips := 0, 0
 
@@ -220,14 +232,14 @@ func generateAudioItems(ctx context.Context, actions []types.Action, takes map[s
 				}
 				providedClips++
 			} else if provider == "kokoro" {
-				audioData, err = getAudioFromKokoro(ctx, textToSpeak)
+				audioData, err = getAudioFromKokoro(ctx, speech.StripTags(textToSpeak))
 				if err != nil {
 					return nil, fmt.Errorf("error converting text to audio via kokoro: %w", err)
 				}
 				mp3Url = "data:audio/mpeg;base64," + base64.StdEncoding.EncodeToString(audioData)
 			} else {
 				var reused bool
-				audioData, mp3Url, reused, err = elevenLabsClip(ctx, textToSpeak, ttsApiKey, ttsVoiceId, s3, cache)
+				audioData, mp3Url, reused, err = elevenLabsClip(ctx, textToSpeak, ttsApiKey, voice, s3, cache)
 				if err != nil {
 					return nil, err
 				}
@@ -312,6 +324,17 @@ func getAudioFromKokoro(ctx context.Context, text string) ([]byte, error) {
 		return nil, fmt.Errorf("TTS service returned %d: %s", resp.StatusCode, string(body))
 	}
 	return io.ReadAll(resp.Body)
+}
+
+// resolveTTSVoice is the ElevenLabs voice and model from the environment:
+// ELEVEN_LABS_VOICE_ID (see resolveTTSVoiceID) and ELEVEN_LABS_MODEL_ID, such
+// as eleven_v4 or eleven_v3 for voices that act out audio tags. With no model
+// set, the voice keeps the model it has always had (Voice.Model).
+func resolveTTSVoice() elevenlabs.Voice {
+	return elevenlabs.Voice{
+		ID:      resolveTTSVoiceID(),
+		ModelID: strings.TrimSpace(os.Getenv("ELEVEN_LABS_MODEL_ID")),
+	}
 }
 
 func resolveTTSVoiceID() string {

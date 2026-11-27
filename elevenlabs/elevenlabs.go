@@ -9,10 +9,64 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/codevideo/codevideo-cli/speech"
 )
+
+const (
+	// defaultVoiceID speaks when no voice is set.
+	defaultVoiceID = "iP95p4xoKVk53GoZ742B"
+	// chrisVoiceID is Chris's clone, which uses eleven_turbo_v2 unless a model is set.
+	chrisVoiceID = "1RLeGxy9FHYB5ScpFkts"
+	// defaultModelID is the model for every other voice unless a model is set.
+	defaultModelID = "eleven_multilingual_v2"
+)
+
+// Voice is who narrates, and with which ElevenLabs model. An empty ID means
+// the default voice, and an empty ModelID the model picked for the voice.
+type Voice struct {
+	ID      string
+	ModelID string
+}
+
+// Model is the ElevenLabs model ID the voice speaks with: ModelID when set
+// (ELEVEN_LABS_MODEL_ID), otherwise eleven_turbo_v2 for Chris's clone and
+// eleven_multilingual_v2 for everyone else, as before models could be chosen.
+func (v Voice) Model() string {
+	if v.ModelID != "" {
+		return v.ModelID
+	}
+	if v.ID == chrisVoiceID {
+		return "eleven_turbo_v2"
+	}
+	return defaultModelID
+}
+
+func (v Voice) id() string {
+	if v.ID == "" {
+		return defaultVoiceID
+	}
+	return v.ID
+}
+
+var modelGeneration = regexp.MustCompile(`^eleven_v(\d+)`)
+
+// ReadsAudioTags reports whether a model acts out audio tags like [whispers]
+// instead of reading them aloud: Eleven v3 and every later generation
+// (eleven_v3, eleven_v3_conversational, eleven_v4, eleven_v4_turbo, ...).
+func ReadsAudioTags(model string) bool {
+	m := modelGeneration.FindStringSubmatch(model)
+	if m == nil {
+		return false
+	}
+	generation, err := strconv.Atoi(m[1])
+	return err == nil && generation >= 3
+}
 
 var customSpeechTransforms = map[string]string{
 	"C#":          "C sharp",
@@ -78,15 +132,17 @@ type request struct {
 	body    []byte
 }
 
-func newRequest(textToSpeak, ttsVoiceId string) (request, error) {
+func newRequest(textToSpeak string, voice Voice) (request, error) {
+	modelId := voice.Model()
+
+	// Models before v3 would read audio tags aloud, so they never see them.
+	// Text without tags is unchanged, so its request (and ClipKey) is too.
+	if !ReadsAudioTags(modelId) {
+		textToSpeak = speech.StripTags(textToSpeak)
+	}
+
 	// Apply any custom transforms
 	textToSpeak = applyCustomTransforms(textToSpeak)
-
-	// model ID - if it is my voice (1RLeGxy9FHYB5ScpFkts) use "eleven_turbo_v2"
-	modelId := "eleven_multilingual_v2"
-	if ttsVoiceId == "1RLeGxy9FHYB5ScpFkts" {
-		modelId = "eleven_turbo_v2"
-	}
 
 	// Prepare the request payload.
 	// It must match the API’s expected JSON structure.
@@ -112,19 +168,15 @@ func newRequest(textToSpeak, ttsVoiceId string) (request, error) {
 		return request{}, fmt.Errorf("error marshalling payload: %w", err)
 	}
 
-	// If no voice id is provided, use the default.
-	if ttsVoiceId == "" {
-		ttsVoiceId = "iP95p4xoKVk53GoZ742B"
-	}
-	return request{voiceID: ttsVoiceId, body: reqBody}, nil
+	return request{voiceID: voice.id(), body: reqBody}, nil
 }
 
 // ClipKey names the clip GetAudioArrayBufferElevenLabs would make: a hash of
 // the voice, the model, the voice settings and the text after the speech
 // transforms. A change to any of them gives a new key, so a reused clip always
 // matches what ElevenLabs would return now.
-func ClipKey(textToSpeak, ttsVoiceId string) (string, error) {
-	r, err := newRequest(textToSpeak, ttsVoiceId)
+func ClipKey(textToSpeak string, voice Voice) (string, error) {
+	r, err := newRequest(textToSpeak, voice)
 	if err != nil {
 		return "", err
 	}
@@ -134,8 +186,8 @@ func ClipKey(textToSpeak, ttsVoiceId string) (string, error) {
 
 // GetAudioArrayBufferElevenLabs sends a POST request to ElevenLabs’ TTS API
 // and returns the audio data as a byte slice. Cancelling ctx abandons the request.
-func GetAudioArrayBufferElevenLabs(ctx context.Context, textToSpeak, ttsApiKey, ttsVoiceId string) ([]byte, error) {
-	r, err := newRequest(textToSpeak, ttsVoiceId)
+func GetAudioArrayBufferElevenLabs(ctx context.Context, textToSpeak, ttsApiKey string, voice Voice) ([]byte, error) {
+	r, err := newRequest(textToSpeak, voice)
 	if err != nil {
 		return nil, err
 	}

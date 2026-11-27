@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
+	"github.com/codevideo/codevideo-cli/speech"
 	"github.com/codevideo/codevideo-cli/types"
 )
 
@@ -70,7 +71,7 @@ func ActionDurationsMs(actions []types.Action, o Options) []float64 {
 	for i, action := range actions {
 		// Every action first waits a standard pause so the DOM can settle.
 		ms := o.StandardPauseMs
-		if speech[action.Name] {
+		if speakActions[action.Name] {
 			ms += max(0, speechEndsAtMs-(elapsedMs+ms))
 			speechMs := speechLengthMs(action, i, o)
 			if action.Name == "author-speak-during" {
@@ -107,15 +108,16 @@ func TotalMs(actions []types.Action, o Options) float64 {
 	return total
 }
 
-var speech = map[string]bool{"author-speak-before": true, "author-speak-after": true, "author-speak-during": true}
+var speakActions = map[string]bool{"author-speak-before": true, "author-speak-after": true, "author-speak-during": true}
 
 // speechLengthMs is how long a narration clip plays: measured if known,
-// otherwise from its word count.
+// otherwise from its word count. Audio tags such as [whispers] are directions,
+// not words, so they don't count.
 func speechLengthMs(action types.Action, index int, o Options) float64 {
 	if ms, ok := o.SpeechMs[index]; ok && ms > 0 {
 		return ms
 	}
-	return float64(len(strings.Fields(action.Value))) / wordsPerSecond * 1000
+	return float64(len(strings.Fields(speech.StripTags(action.Value)))) / wordsPerSecond * 1000
 }
 
 func perRunMs(action types.Action, o Options) float64 {

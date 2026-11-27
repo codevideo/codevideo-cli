@@ -56,6 +56,16 @@
         { "name": "author-speak-during", "value": "Still talking at the end." }
       ],
       "expectedMs": [100, 150, 3850, 2100]
+    },
+    {
+      "name": "audio tags like [whispers] are directions, not words, so narration without a measured clip doesn't count them",
+      "options": { "standardPauseMs": 100 },
+      "actions": [
+        { "name": "author-speak-before", "value": "[exaggerated clueless voice] uh, what is odd or even" },
+        { "name": "author-speak-before", "value": "Well, [sigh] fine." },
+        { "name": "author-speak-before", "value": "Index arr[0] and [1, 2] stay." }
+      ],
+      "expectedMs": [2500, 900, 2500]
     }
   ]
 }

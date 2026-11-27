@@ -1,0 +1,26 @@
+{
+  "about": "Shared by codevideo-types (__tests__/fixtures) and codevideo-cli (speech/testdata). Keep both copies identical. Each case is narration text and the same text with its audio tags removed.",
+  "cases": [
+    { "text": "[exaggerated clueless voice] uh, what is odd or even, I don't understand those words", "stripped": "uh, what is odd or even, I don't understand those words" },
+    { "text": "Well, [sigh] I'm not sure.", "stripped": "Well, I'm not sure." },
+    { "text": "Hello [laughs].", "stripped": "Hello." },
+    { "text": "That's it [laughs]", "stripped": "That's it" },
+    { "text": "[annoyed] [under his breath] Fine.", "stripped": "Fine." },
+    { "text": "Hello [laughs] [sighs].", "stripped": "Hello." },
+    { "text": "So [pause] we [pause] wait.", "stripped": "So we wait." },
+    { "text": "It was a VERY long day [sigh] … nobody listens anymore.", "stripped": "It was a VERY long day … nobody listens anymore." },
+    { "text": "Done [laughs]… really.", "stripped": "Done… really." },
+    { "text": "[lower, thoughtful] Let's think.", "stripped": "Let's think." },
+    { "text": "[Gentle laugh, then sincere] Thanks!", "stripped": "Thanks!" },
+    { "text": "[can’t believe it] Wow.", "stripped": "Wow." },
+    { "text": "[half-whispered] Psst.", "stripped": "Psst." },
+    { "text": "Line one [sighs]\nline two", "stripped": "Line one line two" },
+    { "text": "[whispers]", "stripped": "" },
+    { "text": "Take arr[0] and list[index] from [1, 2, 3].", "stripped": "Take arr[0] and list[index] from [1, 2, 3]." },
+    { "text": "A [link](url) and [x]y stay.", "stripped": "A [link](url) and [x]y stay." },
+    { "text": "Named [clueless_voice] stays.", "stripped": "Named [clueless_voice] stays." },
+    { "text": "An empty [] or [ spaced] pair stays.", "stripped": "An empty [] or [ spaced] pair stays." },
+    { "text": "Spaces  stay  as  they  are.", "stripped": "Spaces  stay  as  they  are." },
+    { "text": "", "stripped": "" }
+  ]
+}
