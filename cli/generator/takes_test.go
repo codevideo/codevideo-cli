@@ -173,3 +173,20 @@ func TestBadTakesAreRefusedBeforeTheRender(t *testing.T) {
 		t.Fatalf("a repeated identical take was refused: %v", err)
 	}
 }
+
+// Windows file URLs keep their drive, whether they're written with three
+// slashes (file:///C:/...) or two (file://C:/..., which puts C: in the host).
+func TestFilePathFromURLKeepsWindowsDrives(t *testing.T) {
+	cases := map[string]string{
+		"file:///C:/clips/a.mp3":     "C:/clips/a.mp3",
+		"file://C:/clips/a.mp3":      "C:/clips/a.mp3",
+		"file:///home/me/a.mp3":      "/home/me/a.mp3",
+		"file:///tmp/with%20space":   "/tmp/with space",
+		"file://localhost/tmp/a.mp3": "/tmp/a.mp3",
+	}
+	for raw, want := range cases {
+		if got := filePathFromURL(raw); got != filepath.FromSlash(want) {
+			t.Errorf("filePathFromURL(%q) = %q, want %q", raw, got, filepath.FromSlash(want))
+		}
+	}
+}

@@ -109,9 +109,13 @@ func filePathFromURL(raw string) string {
 		return raw
 	}
 	path := parsed.Path
+	switch {
 	// file:///C:/clips/a.mp3 has the path /C:/clips/a.mp3 on Windows.
-	if len(path) > 2 && path[0] == '/' && path[2] == ':' {
+	case len(path) > 2 && path[0] == '/' && path[2] == ':':
 		path = path[1:]
+	// file://C:/clips/a.mp3, with two slashes, puts the drive in the host.
+	case len(parsed.Host) == 2 && parsed.Host[1] == ':':
+		path = parsed.Host + path
 	}
 	return filepath.FromSlash(path)
 }
